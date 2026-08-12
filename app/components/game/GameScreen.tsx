@@ -5,7 +5,6 @@ import {
   GRID_COLS,
   GRID_ROWS,
   INITIAL_SUN,
-  LEVELS,
   PLANT_SPECS,
   PROJECTILE_SPEED_PER_TICK,
   SUNFLOWER_FIRST_BURST_MS,
@@ -19,6 +18,7 @@ import {
   PEASHOOTER_SHOOT_MS,
   ZOMBIE_SPECS,
 } from "./constants";
+import { getCompiledLevel } from "./levels";
 import type {
   GamePhase,
   LevelConfig,
@@ -27,6 +27,7 @@ import type {
   Projectile,
   ZombieInstance,
 } from "./types";
+import { LEVELS } from "./levels";
 
 const createId = () => Math.random().toString(36).slice(2, 9);
 
@@ -73,12 +74,14 @@ export default function GameScreen() {
     peaShooter: 0,
   });
   const currentLevelRef = useRef<LevelConfig | null>(null);
+  const compiledLevelRef = useRef<ReturnType<typeof getCompiledLevel> | null>(null);
   const gameOverRef = useRef(false);
   const spawnScheduleRef = useRef({
     nextRegularSpawn: 0,
     nextWaveStart: 0,
     nextWaveSpawn: 0,
     nextWaveNumber: 1,
+    batchIndex: 0,
   });
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -128,17 +131,20 @@ export default function GameScreen() {
 
   const startLevel = (levelId: number) => {
     const levelToStart = LEVELS.find((level) => level.id === levelId) || LEVELS[0];
+    const compiledLevel = getCompiledLevel(levelId);
     const now = Date.now();
 
     resetGameState();
     setSelectedLevelId(levelId);
     setCurrentLevel(levelToStart);
     currentLevelRef.current = levelToStart;
+    compiledLevelRef.current = compiledLevel;
     spawnScheduleRef.current = {
       nextRegularSpawn: now + levelToStart.initialDelayMs,
       nextWaveStart: 0,
       nextWaveSpawn: 0,
       nextWaveNumber: 1,
+      batchIndex: 0,
     };
     setGameTime(now);
     setPhase("playing");
@@ -245,17 +251,23 @@ export default function GameScreen() {
     const betweenDelay = currentLevel.betweenWaveDelayMs;
 
     if (!waveActiveRef.current && regularSpawnedRef.current < totalRegular && now >= spawnState.nextRegularSpawn) {
-      // Spawn different zombie types based on count
-      let zombieType = "basic";
-      if (regularSpawnedRef.current >= 5 && regularSpawnedRef.current < 7) {
-        zombieType = "imp";
-      } else if (regularSpawnedRef.current >= 7) {
-        zombieType = "cone";
+      // Spawn batch of zombies using compiled level's wave spawn batches
+      if (compiledLevelRef.current && spawnState.batchIndex < compiledLevelRef.current.waveSpawns.length) {
+        const batch = compiledLevelRef.current.waveSpawns[spawnState.batchIndex];
+        // Spawn all zombies in this batch (spread across rows)
+        let rowIndex = 0;
+        for (const zombieSpawn of batch) {
+          // Cycle through rows to spread the batch
+          const row = rowIndex % GRID_ROWS;
+          const newZ = spawnZombie(false, zombieSpawn.type);
+          newZ.row = row;
+          nextZombies.push(newZ);
+          regularSpawnedRef.current += 1;
+          rowIndex += 1;
+        }
+        setRegularSpawned(regularSpawnedRef.current);
+        spawnState.batchIndex += 1;
       }
-      const newZ = spawnZombie(false, zombieType);
-      nextZombies.push(newZ);
-      regularSpawnedRef.current += 1;
-      setRegularSpawned(regularSpawnedRef.current);
       spawnState.nextRegularSpawn = now + regularInterval;
 
       if (regularSpawnedRef.current === currentLevel.preWaveCount && firstWaveTotal > 0) {
@@ -280,7 +292,17 @@ export default function GameScreen() {
       const setWaveSpawned = waveNumber === 1 ? setWave1Spawned : setWave2Spawned;
 
       if (waveSpawnedRef.current < waveTotal && now >= spawnState.nextWaveSpawn) {
-        const newZ = spawnZombie(true);
+        // Spawn zombie using compiled level's boss wave sequence for correct type
+        let zombieType = "basic";
+        const waveIdx = spawnState.nextWaveNumber - 1; // 1-indexed to 0-indexed
+        if (
+          compiledLevelRef.current &&
+          waveIdx < compiledLevelRef.current.bossWaveSequences.length &&
+          waveSpawnedRef.current < compiledLevelRef.current.bossWaveSequences[waveIdx].length
+        ) {
+          zombieType = compiledLevelRef.current.bossWaveSequences[waveIdx][waveSpawnedRef.current].type;
+        }
+        const newZ = spawnZombie(true, zombieType);
         nextZombies.push(newZ);
         waveSpawnedRef.current += 1;
         setWaveSpawned(waveSpawnedRef.current);
