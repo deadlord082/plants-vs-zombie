@@ -5,6 +5,8 @@ export const GRID_ROWS = 6;
 export const INITIAL_SUN = 50;
 export const ZOMBIE_HP = 200;
 export const ZOMBIE_MOVE_MS = 3000;
+export const ZOMBIE_SPAWN_OFFSET = 1; // spawn just right of the grid
+export const ZOMBIE_LEFT_TRIGGER_X = -1; // when zombie x <= this -> game over
 export const ZOMBIE_ATTACK_MS = 1000;
 export const SUNFLOWER_GENERATION_MS = 30000;
 export const SUNFLOWER_FIRST_BURST_MS = 10000;

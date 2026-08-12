@@ -13,6 +13,8 @@ import {
   ZOMBIE_ATTACK_MS,
   ZOMBIE_HP,
   ZOMBIE_MOVE_MS,
+  ZOMBIE_SPAWN_OFFSET,
+  ZOMBIE_LEFT_TRIGGER_X,
   GAME_TICK_MS,
   PEASHOOTER_SHOOT_MS,
   ZOMBIE_SPECS,
@@ -185,7 +187,7 @@ export default function GameScreen() {
       id: createId(),
       row: randomRow(),
       col: GRID_COLS - 1,
-      x: GRID_COLS - 0.5,
+      x: GRID_COLS + ZOMBIE_SPAWN_OFFSET,
       hp: ZOMBIE_HP,
       lastMoveAt: now,
       lastAttackAt: now,
@@ -292,8 +294,10 @@ export default function GameScreen() {
 
       if (plant.type === "peaShooter" && plant.nextShotAt && now >= plant.nextShotAt) {
         const spec = PLANT_SPECS[plant.type];
-        // Only shoot if there's at least one zombie ahead in the same row
-        const anyAhead = zombiesRef.current.some((z) => z.row === plant.row && z.col > plant.col && z.hp > 0);
+        // Only shoot if there's at least one zombie ahead in the same row AND within grid bounds
+        const anyAhead = zombiesRef.current.some(
+          (z) => z.row === plant.row && z.x > plant.col && z.x >= 0 && z.x < GRID_COLS && z.hp > 0
+        );
         if (anyAhead) {
           const shot: Projectile = {
             id: createId(),
@@ -314,41 +318,39 @@ export default function GameScreen() {
 
     nextPlants = nextPlants.filter((plant) => plant.hp > 0);
 
+    // Move projectiles forward but do not affect zombies (zombies don't interact with grid)
     nextProjectiles = nextProjectiles.reduce<Projectile[]>((acc, projectile) => {
       const moved = { ...projectile, x: projectile.x + PROJECTILE_SPEED_PER_TICK };
-      // hit detection: projectile hits a zombie in the same row whose x is close enough
+      // detect hit against nearest zombie in same row
       const hitZombie = nextZombies
-        .filter((zombie) => zombie.row === moved.row && zombie.hp > 0 && moved.x >= zombie.x - 0.2)
+        .filter((z) => z.row === moved.row && z.hp > 0 && moved.x >= z.x - 0.3)
         .sort((a, b) => a.x - b.x)[0];
 
       if (hitZombie) {
-        nextZombies = nextZombies.map((zombie) =>
-          zombie.id === hitZombie.id
-            ? { ...zombie, hp: Math.max(0, zombie.hp - moved.damage) }
-            : zombie,
-        );
-        return acc;
+        nextZombies = nextZombies.map((z) => (z.id === hitZombie.id ? { ...z, hp: Math.max(0, z.hp - moved.damage) } : z));
+        return acc; // projectile consumed
       }
 
-      if (moved.x < GRID_COLS) {
+      // keep projectile alive while it's roughly within screen bounds
+      if (moved.x < GRID_COLS + 5) {
         acc.push(moved);
       }
       return acc;
     }, []);
 
+    // Move zombies smoothly leftward; do not interact with plants or projectiles
     const speedPerTick = GAME_TICK_MS / ZOMBIE_MOVE_MS; // tiles per tick
     nextZombies = nextZombies.map((zombie) => {
-      const plantIndex = nextPlants.findIndex((plant) => plant.row === zombie.row && plant.col === Math.floor(zombie.x));
+      const plantIndex = nextPlants.findIndex((plant) => plant.row === zombie.row && Math.floor(zombie.x) === plant.col);
       if (plantIndex >= 0) {
-        // Zombie attacks the plant periodically
+        // stop moving and attack the plant periodically
         if (now - zombie.lastAttackAt >= ZOMBIE_ATTACK_MS) {
           const plant = nextPlants[plantIndex];
-          const updatedPlant = { ...plant, hp: Math.max(0, plant.hp - (ZOMBIE_SPECS.basic.damage || 50)) };
-          nextPlants[plantIndex] = updatedPlant;
+          nextPlants[plantIndex] = { ...plant, hp: Math.max(0, plant.hp - (ZOMBIE_SPECS.basic.damage || 50)) };
           zombie = { ...zombie, lastAttackAt: now };
         }
 
-        // Plant deals contact damage to zombie when in the same tile
+        // plant deals contact damage (e.g., pea shooter)
         const plant = nextPlants[plantIndex];
         const spec = PLANT_SPECS[plant.type];
         const contactInterval = spec.shootMs || PEASHOOTER_SHOOT_MS;
@@ -356,21 +358,18 @@ export default function GameScreen() {
           nextZombies = nextZombies.map((z) => (z.id === zombie.id ? { ...z, hp: Math.max(0, z.hp - spec.damage) } : z));
           nextPlants[plantIndex] = { ...plant, lastContactAt: now };
         }
+
         return zombie;
       }
 
       // Move continuously towards left
-      const newX = Math.max(0, zombie.x - speedPerTick);
+      const newX = zombie.x - speedPerTick;
       return { ...zombie, x: newX };
     });
 
     nextPlants = nextPlants.filter((plant) => plant.hp > 0);
-    // Check for game over: any zombie at col 0 with no blocking plant
-    const anyReachedEnd = nextZombies.some((z) => {
-      if (z.x > 0) return false;
-      const plantAtEnd = nextPlants.find((p) => p.row === z.row && p.col === 0);
-      return !plantAtEnd;
-    });
+    // Check for game over: any zombie that crosses the left trigger X
+    const anyReachedEnd = nextZombies.some((z) => z.x <= ZOMBIE_LEFT_TRIGGER_X);
     if (anyReachedEnd) {
       setGameOver(true);
       gameOverRef.current = true;
@@ -571,18 +570,16 @@ export default function GameScreen() {
             </div>
 
             <div className="overflow-hidden rounded-3xl border border-slate-700 bg-slate-900/90 p-4 shadow-xl">
-              <div className="grid gap-1 bg-slate-950 p-1 sm:p-2" style={{ gridTemplateColumns: `repeat(${GRID_COLS}, minmax(0, 1fr))` }}>
+              <div className="relative grid gap-1 bg-slate-950 p-1 sm:p-2" style={{ gridTemplateColumns: `repeat(${GRID_COLS}, minmax(0, 1fr))` }}>
                 {grid.flat().map(({ row, col }) => {
                   const plant = plants.find((item) => item.row === row && item.col === col);
-                  const zombie = zombies.find((item) => item.row === row && Math.floor(item.x) === col);
-                  const projectile = projectiles.find((item) => item.row === row && Math.floor(item.x) === col);
 
                   return (
                     <button
                       key={tileKey(row, col)}
                       type="button"
                       onClick={() => handlePlacePlant(row, col)}
-                      className={`relative min-h-16 overflow-hidden rounded-2xl border p-2 text-left transition ${zombie ? "border-rose-500/70 bg-rose-950/40 hover:border-rose-400" : "border-slate-800 bg-slate-950/80 hover:border-lime-400"}`}
+                      className={`relative min-h-16 overflow-hidden rounded-2xl border p-2 text-left transition ${"border-slate-800 bg-slate-950/80 hover:border-lime-400"}`}
                     >
                       <div className="absolute inset-x-0 top-0 h-1 bg-slate-800" />
                       {plant && (
@@ -591,22 +588,42 @@ export default function GameScreen() {
                           <span className="text-[11px] text-slate-200">HP: {plant.hp}</span>
                         </div>
                       )}
-                      {zombie && (
-                        <div className="absolute left-2 top-2 rounded-full bg-rose-500/90 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-white">
-                          Z
-                        </div>
-                      )}
-                      {zombie && (
-                        <div className="absolute bottom-2 left-2 rounded-full bg-rose-500/80 px-2 py-0.5 text-[10px] font-semibold text-white">
-                          HP: {zombie.hp}
-                        </div>
-                      )}
-                      {projectile && (
-                        <div className="absolute left-1/2 top-1/2 h-2 w-2 -translate-y-1/2 -translate-x-1/2 rounded-full bg-cyan-300" />
-                      )}
                     </button>
                   );
                 })}
+
+                {/* Zombie overlay: render zombies absolutely so they can move smoothly (fractional x) */}
+                {zombies.map((z) => (
+                  <div
+                    key={z.id}
+                    className="absolute pointer-events-none"
+                    style={{
+                      left: `${(z.x / GRID_COLS) * 100}%`,
+                      top: `${((z.row + 0.5) / GRID_ROWS) * 100}%`,
+                      transform: "translate(-50%, -50%)",
+                      transition: `left ${GAME_TICK_MS}ms linear, top ${GAME_TICK_MS}ms linear`,
+                    }}
+                  >
+                    <div className="rounded-full bg-rose-500/90 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-white">Z</div>
+                    <div className="mt-1 text-[10px] text-white text-center bg-rose-500/80 rounded-full px-2 py-0.5">HP: {z.hp}</div>
+                  </div>
+                ))}
+
+                {/* Projectile overlay: render projectiles absolutely for smooth movement */}
+                {projectiles.map((p) => (
+                  <div
+                    key={p.id}
+                    className="absolute pointer-events-none"
+                    style={{
+                      left: `${(p.x / GRID_COLS) * 100}%`,
+                      top: `${((p.row + 0.5) / GRID_ROWS) * 100}%`,
+                      transform: "translate(-50%, -50%)",
+                      transition: `left ${GAME_TICK_MS}ms linear, top ${GAME_TICK_MS}ms linear`,
+                    }}
+                  >
+                    <div className="h-2 w-2 rounded-full bg-cyan-300" />
+                  </div>
+                ))}
               </div>
             </div>
           </div>
