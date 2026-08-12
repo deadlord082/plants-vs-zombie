@@ -199,6 +199,7 @@ export default function GameScreen() {
       lastMoveAt: now,
       lastAttackAt: now,
       isWave,
+      spawnedAt: now,
     };
     return newZombie;
   };
@@ -349,6 +350,7 @@ export default function GameScreen() {
 
     // Move zombies smoothly leftward; do not interact with plants or projectiles
     const speedPerTick = GAME_TICK_MS / ZOMBIE_MOVE_MS; // tiles per tick
+    const walkPeriodMs = 3000; // 1.5 second walking cycle
     nextZombies = nextZombies.map((zombie) => {
       const plantIndex = nextPlants.findIndex((plant) => plant.row === zombie.row && Math.floor(zombie.x) === plant.col);
       if (plantIndex >= 0) {
@@ -371,8 +373,11 @@ export default function GameScreen() {
         return zombie;
       }
 
-      // Move continuously towards left
-      const newX = zombie.x - speedPerTick;
+      // Move continuously towards left with marching gait (sine wave speed variation)
+      const elapsedMs = now - zombie.spawnedAt;
+      const phase = (elapsedMs / walkPeriodMs) * Math.PI * 2;
+      const speedMultiplier = 1 + 0.9 * Math.sin(phase); // varies from 0.65 to 1.35
+      const newX = zombie.x - (speedPerTick * speedMultiplier);
       return { ...zombie, x: newX };
     });
 

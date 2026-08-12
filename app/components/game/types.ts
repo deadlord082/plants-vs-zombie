@@ -52,6 +52,7 @@ export interface ZombieInstance {
   lastMoveAt: number;
   lastAttackAt: number;
   isWave: boolean;
+  spawnedAt: number;
 }
 
 export interface Projectile {
