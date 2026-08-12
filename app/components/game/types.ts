@@ -39,6 +39,8 @@ export interface PlantInstance {
   nextSunAt?: number;
   nextShotAt?: number;
   lastContactAt?: number;
+  sunIntervalMs?: number; // randomized sun generation interval
+  shootIntervalMs?: number; // randomized attack interval
 }
 
 export interface ZombieInstance {

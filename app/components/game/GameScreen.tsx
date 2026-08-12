@@ -34,6 +34,11 @@ const tileKey = (row: number, col: number) => `${row}-${col}`;
 
 const randomRow = () => Math.floor(Math.random() * GRID_ROWS);
 
+const randomizeInterval = (interval: number): number => {
+  const variance = 1 + (Math.random() - 0.5) * 0.2;
+  return interval * variance;
+};
+
 export default function GameScreen() {
   const [phase, setPhase] = useState<GamePhase>("menu");
   const [selectedPlant, setSelectedPlant] = useState<PlantTypeKey>("sunflower");
@@ -171,6 +176,8 @@ export default function GameScreen() {
       nextSunAt: selectedPlant === "sunflower" ? now + SUNFLOWER_FIRST_BURST_MS : undefined,
       nextShotAt: selectedPlant === "peaShooter" ? now + PEASHOOTER_SHOOT_MS : undefined,
       lastContactAt: now,
+      sunIntervalMs: selectedPlant === "sunflower" ? randomizeInterval(spec.generateMs || SUNFLOWER_GENERATION_MS) : undefined,
+      shootIntervalMs: selectedPlant === "peaShooter" ? randomizeInterval(spec.shootMs || PEASHOOTER_SHOOT_MS) : undefined,
     };
 
     setPlantsState([...plantsRef.current, newPlant]);
@@ -286,9 +293,10 @@ export default function GameScreen() {
       if (plant.type === "sunflower" && plant.nextSunAt && now >= plant.nextSunAt) {
         const spec = PLANT_SPECS[plant.type];
         nextSun += spec.generateAmount || 50;
+        const interval = plant.sunIntervalMs || (spec.generateMs || SUNFLOWER_GENERATION_MS);
         return {
           ...plant,
-          nextSunAt: plant.nextSunAt + (spec.generateMs || SUNFLOWER_GENERATION_MS),
+          nextSunAt: plant.nextSunAt + interval,
         };
       }
 
@@ -307,9 +315,10 @@ export default function GameScreen() {
           };
           nextProjectiles = [...nextProjectiles, shot];
         }
+        const interval = plant.shootIntervalMs || (spec.shootMs || PEASHOOTER_SHOOT_MS);
         return {
           ...plant,
-          nextShotAt: plant.nextShotAt + (spec.shootMs || PEASHOOTER_SHOOT_MS),
+          nextShotAt: plant.nextShotAt + interval,
         };
       }
 
