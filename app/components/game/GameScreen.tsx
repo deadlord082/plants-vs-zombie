@@ -188,18 +188,21 @@ export default function GameScreen() {
     });
   };
 
-  const spawnZombie = (isWave: boolean) => {
+  const spawnZombie = (isWave: boolean, type: string = "basic") => {
     const now = Date.now();
+    const spec = ZOMBIE_SPECS[type] || ZOMBIE_SPECS.basic;
     const newZombie: ZombieInstance = {
       id: createId(),
       row: randomRow(),
       col: GRID_COLS - 1,
       x: GRID_COLS + ZOMBIE_SPAWN_OFFSET,
-      hp: ZOMBIE_HP,
+      hp: spec.hp,
+      armor: spec.armor,
       lastMoveAt: now,
       lastAttackAt: now,
       isWave,
       spawnedAt: now,
+      type,
     };
     return newZombie;
   };
@@ -242,7 +245,14 @@ export default function GameScreen() {
     const betweenDelay = currentLevel.betweenWaveDelayMs;
 
     if (!waveActiveRef.current && regularSpawnedRef.current < totalRegular && now >= spawnState.nextRegularSpawn) {
-      const newZ = spawnZombie(false);
+      // Spawn different zombie types based on count
+      let zombieType = "basic";
+      if (regularSpawnedRef.current >= 5 && regularSpawnedRef.current < 7) {
+        zombieType = "imp";
+      } else if (regularSpawnedRef.current >= 7) {
+        zombieType = "cone";
+      }
+      const newZ = spawnZombie(false, zombieType);
       nextZombies.push(newZ);
       regularSpawnedRef.current += 1;
       setRegularSpawned(regularSpawnedRef.current);
@@ -337,7 +347,18 @@ export default function GameScreen() {
         .sort((a, b) => a.x - b.x)[0];
 
       if (hitZombie) {
-        nextZombies = nextZombies.map((z) => (z.id === hitZombie.id ? { ...z, hp: Math.max(0, z.hp - moved.damage) } : z));
+        let damageToHP = moved.damage;
+        let newArmor = hitZombie.armor;
+        // Armor absorbs damage first
+        if (newArmor > 0) {
+          newArmor = Math.max(0, newArmor - moved.damage);
+          damageToHP = moved.damage - (hitZombie.armor - newArmor);
+        }
+        nextZombies = nextZombies.map((z) =>
+          z.id === hitZombie.id
+            ? { ...z, armor: newArmor, hp: Math.max(0, z.hp - damageToHP) }
+            : z
+        );
         return acc; // projectile consumed
       }
 
@@ -349,7 +370,6 @@ export default function GameScreen() {
     }, []);
 
     // Move zombies smoothly leftward; do not interact with plants or projectiles
-    const speedPerTick = GAME_TICK_MS / ZOMBIE_MOVE_MS; // tiles per tick
     const walkPeriodMs = 3000; // 1.5 second walking cycle
     nextZombies = nextZombies.map((zombie) => {
       const plantIndex = nextPlants.findIndex((plant) => plant.row === zombie.row && Math.floor(zombie.x) === plant.col);
@@ -357,7 +377,7 @@ export default function GameScreen() {
         // stop moving and attack the plant periodically
         if (now - zombie.lastAttackAt >= ZOMBIE_ATTACK_MS) {
           const plant = nextPlants[plantIndex];
-          nextPlants[plantIndex] = { ...plant, hp: Math.max(0, plant.hp - (ZOMBIE_SPECS.basic.damage || 50)) };
+          nextPlants[plantIndex] = { ...plant, hp: Math.max(0, plant.hp - (ZOMBIE_SPECS[zombie.type]?.damage || 50)) };
           zombie = { ...zombie, lastAttackAt: now };
         }
 
@@ -366,7 +386,18 @@ export default function GameScreen() {
         const spec = PLANT_SPECS[plant.type];
         const contactInterval = spec.shootMs || PEASHOOTER_SHOOT_MS;
         if (spec.damage && now - (plant.lastContactAt || 0) >= contactInterval) {
-          nextZombies = nextZombies.map((z) => (z.id === zombie.id ? { ...z, hp: Math.max(0, z.hp - spec.damage) } : z));
+          let damageToHP = spec.damage;
+          let newArmor = zombie.armor;
+          // Armor absorbs damage first
+          if (newArmor > 0) {
+            newArmor = Math.max(0, newArmor - spec.damage);
+            damageToHP = spec.damage - (zombie.armor - newArmor);
+          }
+          nextZombies = nextZombies.map((z) =>
+            z.id === zombie.id
+              ? { ...z, armor: newArmor, hp: Math.max(0, z.hp - damageToHP) }
+              : z
+          );
           nextPlants[plantIndex] = { ...plant, lastContactAt: now };
         }
 
@@ -374,6 +405,9 @@ export default function GameScreen() {
       }
 
       // Move continuously towards left with marching gait (sine wave speed variation)
+      // Each zombie type has its own speed from spec
+      const zombieSpec = ZOMBIE_SPECS[zombie.type] || ZOMBIE_SPECS.basic;
+      const speedPerTick = GAME_TICK_MS / zombieSpec.moveMs; // tiles per tick
       const elapsedMs = now - zombie.spawnedAt;
       const phase = (elapsedMs / walkPeriodMs) * Math.PI * 2;
       const speedMultiplier = 1 + 0.9 * Math.sin(phase); // varies from 0.65 to 1.35
@@ -607,21 +641,34 @@ export default function GameScreen() {
                 })}
 
                 {/* Zombie overlay: render zombies absolutely so they can move smoothly (fractional x) */}
-                {zombies.map((z) => (
-                  <div
-                    key={z.id}
-                    className="absolute pointer-events-none"
-                    style={{
-                      left: `${(z.x / GRID_COLS) * 100}%`,
-                      top: `${((z.row + 0.5) / GRID_ROWS) * 100}%`,
-                      transform: "translate(-50%, -50%)",
-                      transition: `left ${GAME_TICK_MS}ms linear, top ${GAME_TICK_MS}ms linear`,
-                    }}
-                  >
-                    <div className="rounded-full bg-rose-500/90 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-white">Z</div>
-                    <div className="mt-1 text-[10px] text-white text-center bg-rose-500/80 rounded-full px-2 py-0.5">HP: {z.hp}</div>
-                  </div>
-                ))}
+                {zombies.map((z) => {
+                  let zombieLabel = "Z";
+                  let bgColor = "bg-rose-500/90";
+                  if (z.type === "imp") {
+                    zombieLabel = "IMP";
+                    bgColor = "bg-purple-600/90";
+                  } else if (z.type === "cone") {
+                    zombieLabel = "CONE";
+                    bgColor = "bg-yellow-600/90";
+                  }
+                  return (
+                    <div
+                      key={z.id}
+                      className="absolute pointer-events-none"
+                      style={{
+                        left: `${(z.x / GRID_COLS) * 100}%`,
+                        top: `${((z.row + 0.5) / GRID_ROWS) * 100}%`,
+                        transform: "translate(-50%, -50%)",
+                        transition: `left ${GAME_TICK_MS}ms linear, top ${GAME_TICK_MS}ms linear`,
+                      }}
+                    >
+                      <div className={`rounded-full ${bgColor} px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-white`}>{zombieLabel}</div>
+                      <div className="mt-1 text-[10px] text-white text-center bg-rose-500/80 rounded-full px-2 py-0.5">
+                        HP: {z.hp}{z.armor > 0 ? ` | A: ${z.armor}` : ""}
+                      </div>
+                    </div>
+                  );
+                })}
 
                 {/* Projectile overlay: render projectiles absolutely for smooth movement */}
                 {projectiles.map((p) => (

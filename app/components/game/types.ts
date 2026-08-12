@@ -49,10 +49,12 @@ export interface ZombieInstance {
   col: number;
   x: number;
   hp: number;
+  armor: number;
   lastMoveAt: number;
   lastAttackAt: number;
   isWave: boolean;
   spawnedAt: number;
+  type: string;
 }
 
 export interface Projectile {

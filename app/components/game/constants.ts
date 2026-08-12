@@ -19,7 +19,7 @@ export const LEVELS: LevelConfig[] = [
     id: 1,
     title: "Level 1",
     description: "Easy introduction level with a small first wave.",
-    preWaveCount: 5,
+    preWaveCount: 10,
     wave1Count: 10,
     midCount: 0,
     wave2Count: 0,
@@ -73,6 +73,7 @@ export interface ZombieSpec {
   moveMs: number;
   attackMs: number;
   damage: number;
+  armor: number;
 }
 
 export const ZOMBIE_SPECS: Record<string, ZombieSpec> = {
@@ -82,5 +83,22 @@ export const ZOMBIE_SPECS: Record<string, ZombieSpec> = {
     moveMs: ZOMBIE_MOVE_MS,
     attackMs: ZOMBIE_ATTACK_MS,
     damage: 50,
+    armor: 0,
+  },
+  imp: {
+    key: "imp",
+    hp: 120,
+    moveMs: Math.round(ZOMBIE_MOVE_MS / 1.5),
+    attackMs: ZOMBIE_ATTACK_MS,
+    damage: 50,
+    armor: 0,
+  },
+  cone: {
+    key: "cone",
+    hp: ZOMBIE_HP,
+    moveMs: ZOMBIE_MOVE_MS,
+    attackMs: ZOMBIE_ATTACK_MS,
+    damage: 50,
+    armor: 340,
   },
 };
