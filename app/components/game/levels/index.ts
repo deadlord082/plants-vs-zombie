@@ -6,7 +6,7 @@ import { compileLevelDefinition, toLevelConfig } from "./loader";
 import type { LevelConfig } from "../types";
 
 // Compile all level definitions
-const COMPILED_LEVELS = [LEVEL_1, LEVEL_2, LEVEL_3, LEVEL_TUTO].map(compileLevelDefinition);
+const COMPILED_LEVELS = [LEVEL_TUTO, LEVEL_1, LEVEL_2, LEVEL_3].map(compileLevelDefinition);
 
 // Export as standard LevelConfig for backwards compatibility
 export const LEVELS: LevelConfig[] = COMPILED_LEVELS.map(toLevelConfig);

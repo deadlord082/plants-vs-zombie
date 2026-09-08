@@ -8,13 +8,14 @@ export const LEVEL_1: LevelDefinition = {
   regularSpawnIntervalMs: 30000,
   betweenWaveDelayMs: 3000,
   waveSpawnIntervalMs: 1200,
+  skySunIntervalMs: 10000,
   tiles: [
-    ["normal", "normal", "normal", "normal", "normal", "normal", "normal", "normal", "normal", "normal", "normal", "normal"],
-    ["normal", "normal", "normal", "normal", "normal", "normal", "normal", "normal", "normal", "normal", "normal", "normal"],
-    ["normal", "normal", "normal", "normal", "normal", "normal", "normal", "normal", "normal", "normal", "normal", "normal"],
-    ["normal", "normal", "normal", "normal", "normal", "normal", "normal", "normal", "normal", "normal", "normal", "normal"],
-    ["normal", "normal", "normal", "normal", "normal", "normal", "normal", "normal", "normal", "normal", "normal", "normal"],
-    ["normal", "normal", "normal", "normal", "normal", "normal", "normal", "normal", "normal", "normal", "normal", "normal"],
+    ["normal", "normalDark", "normal", "normalDark", "normal", "normalDark", "normal", "normalDark", "normal", "normalDark", "normal", "normalDark"],
+    ["normalDark", "normal", "normalDark", "normal", "normalDark", "normal", "normalDark", "normal", "normalDark", "normal", "normalDark", "normal"],
+    ["normal", "normalDark", "normal", "normalDark", "normal", "normalDark", "normal", "normalDark", "normal", "normalDark", "normal", "normalDark"],
+    ["normalDark", "normal", "normalDark", "normal", "normalDark", "normal", "normalDark", "normal", "normalDark", "normal", "normalDark", "normal"],
+    ["normal", "normalDark", "normal", "normalDark", "normal", "normalDark", "normal", "normalDark", "normal", "normalDark", "normal", "normalDark"],
+    ["normalDark", "normal", "normalDark", "normal", "normalDark", "normal", "normalDark", "normal", "normalDark", "normal", "normalDark", "normal"],
   ],
   // Waves: each batch spawns together, separated by regularSpawnIntervalMs
   waves: [

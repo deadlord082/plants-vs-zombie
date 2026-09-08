@@ -14,6 +14,7 @@ export interface LevelConfig {
   regularSpawnIntervalMs: number;
   betweenWaveDelayMs: number;
   waveSpawnIntervalMs: number;
+  skySunIntervalMs?: number;
   tiles: TileType[][];
 }
 
@@ -64,4 +65,26 @@ export interface Projectile {
   row: number;
   x: number;
   damage: number;
+}
+
+export interface SunInstance {
+  id: string;
+  row: number;
+  x: number;
+  y: number;
+  value: number;
+  expiresAt: number;
+  startX?: number;
+  targetX?: number;
+  startY?: number;
+  peakY?: number;
+  targetY?: number;
+  fallSpeedTilesPerMs?: number;
+  launchAt?: number;
+  velocityY?: number;
+  gravity?: number;
+  arcDurationMs?: number;
+  risingFrom?: number;
+  risingUntil?: number;
+  fallingUntil?: number;
 }

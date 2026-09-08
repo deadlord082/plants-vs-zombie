@@ -8,6 +8,12 @@ export const ZOMBIE_LEFT_TRIGGER_X = -1; // when zombie x <= this -> game over
 export const ZOMBIE_ATTACK_MS = 1000;
 export const SUNFLOWER_GENERATION_MS = 30000;
 export const SUNFLOWER_FIRST_BURST_MS = 10000;
+export const SUN_LIFETIME_MS = 15000;
+export const SKY_SUN_VALUE = 25;
+export const SUN_FALL_SPEED_TILES_PER_MS = 0.003;
+export const SKY_SUN_FALL_SPEED_TILES_PER_MS = SUN_FALL_SPEED_TILES_PER_MS / 4;
+export const SUNFLOWER_ARC_DURATION_MS = 1400;
+export const SUNFLOWER_ARC_HEIGHT_TILES = 0.275;
 export const PEASHOOTER_SHOOT_MS = 1500;
 export const PROJECTILE_SPEED_PER_TICK = 0.8;
 export const GAME_TICK_MS = 200;

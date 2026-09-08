@@ -58,6 +58,7 @@ export function compileLevelDefinition(def: LevelDefinition): CompiledLevelConfi
     regularSpawnIntervalMs: def.regularSpawnIntervalMs,
     betweenWaveDelayMs: def.betweenWaveDelayMs,
     waveSpawnIntervalMs: def.waveSpawnIntervalMs,
+    skySunIntervalMs: def.skySunIntervalMs,
     tiles: def.tiles,
     preWaveCount,
     wave1Count,
@@ -85,6 +86,7 @@ export function toLevelConfig(compiled: CompiledLevelConfig): LevelConfig {
     regularSpawnIntervalMs: compiled.regularSpawnIntervalMs,
     betweenWaveDelayMs: compiled.betweenWaveDelayMs,
     waveSpawnIntervalMs: compiled.waveSpawnIntervalMs,
+    skySunIntervalMs: compiled.skySunIntervalMs,
     tiles: compiled.tiles,
   };
 }

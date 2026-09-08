@@ -14,6 +14,12 @@ import {
   ZOMBIE_LEFT_TRIGGER_X,
   GAME_TICK_MS,
   PEASHOOTER_SHOOT_MS,
+  SKY_SUN_FALL_SPEED_TILES_PER_MS,
+  SKY_SUN_VALUE,
+  SUN_FALL_SPEED_TILES_PER_MS,
+  SUN_LIFETIME_MS,
+  SUNFLOWER_ARC_DURATION_MS,
+  SUNFLOWER_ARC_HEIGHT_TILES,
   ZOMBIE_SPECS,
 } from "./constants";
 import { getCompiledLevel } from "./levels";
@@ -23,6 +29,7 @@ import type {
   PlantInstance,
   PlantTypeKey,
   Projectile,
+  SunInstance,
   ZombieInstance,
 } from "./types";
 import { LEVELS } from "./levels";
@@ -49,6 +56,7 @@ export default function GameScreen() {
   const [plants, setPlants] = useState<PlantInstance[]>([]);
   const [zombies, setZombies] = useState<ZombieInstance[]>([]);
   const [projectiles, setProjectiles] = useState<Projectile[]>([]);
+  const [suns, setSuns] = useState<SunInstance[]>([]);
   const [regularSpawned, setRegularSpawned] = useState(0);
   const [wave1Spawned, setWave1Spawned] = useState(0);
   const [wave2Spawned, setWave2Spawned] = useState(0);
@@ -64,6 +72,7 @@ export default function GameScreen() {
   const plantsRef = useRef<PlantInstance[]>([]);
   const zombiesRef = useRef<ZombieInstance[]>([]);
   const projectilesRef = useRef<Projectile[]>([]);
+  const sunsRef = useRef<SunInstance[]>([]);
   const sunRef = useRef(INITIAL_SUN);
   const regularSpawnedRef = useRef(0);
   const wave1SpawnedRef = useRef(0);
@@ -83,6 +92,7 @@ export default function GameScreen() {
     nextWaveNumber: 1,
     batchIndex: 0,
   });
+  const nextSkySunAtRef = useRef(0);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
   const setPlantsState = (next: PlantInstance[]) => {
@@ -100,6 +110,11 @@ export default function GameScreen() {
     setProjectiles(next);
   };
 
+  const setSunsState = (next: SunInstance[]) => {
+    sunsRef.current = next;
+    setSuns(next);
+  };
+
   const setSunState = (next: number) => {
     sunRef.current = next;
     setSun(next);
@@ -115,6 +130,7 @@ export default function GameScreen() {
     setPlantsState([]);
     setZombiesState([]);
     setProjectilesState([]);
+    setSunsState([]);
     setRegularSpawned(0);
     regularSpawnedRef.current = 0;
     setWave1Spawned(0);
@@ -146,6 +162,7 @@ export default function GameScreen() {
       nextWaveNumber: 1,
       batchIndex: 0,
     };
+    nextSkySunAtRef.current = levelToStart.skySunIntervalMs ? now + levelToStart.skySunIntervalMs : 0;
     setGameTime(now);
     setPhase("playing");
   };
@@ -194,6 +211,14 @@ export default function GameScreen() {
       ...plantReadyRef.current,
       [selectedPlant]: now + spec.rechargeMs,
     });
+  };
+
+  const collectSun = (sunId: string) => {
+    if (phase !== "playing") return;
+    const collectedSun = sunsRef.current.find((item) => item.id === sunId);
+    if (!collectedSun) return;
+    setSunsState(sunsRef.current.filter((item) => item.id !== sunId));
+    setSunState(sunRef.current + collectedSun.value);
   };
 
   const spawnZombie = (isWave: boolean, type: string = "basic") => {
@@ -246,7 +271,57 @@ export default function GameScreen() {
     let nextPlants = plantsRef.current.slice();
     let nextZombies = zombiesRef.current.slice();
     let nextProjectiles = projectilesRef.current.slice();
-    let nextSun = sunRef.current;
+    let nextSuns = sunsRef.current
+      .filter((sun) => sun.expiresAt > now)
+      .map((sun) => {
+        if (
+          sun.launchAt !== undefined &&
+          sun.velocityY !== undefined &&
+          sun.gravity !== undefined &&
+          sun.arcDurationMs !== undefined &&
+          sun.startX !== undefined &&
+          sun.targetX !== undefined &&
+          sun.startY !== undefined
+        ) {
+          const elapsed = Math.min(sun.arcDurationMs, Math.max(0, now - sun.launchAt));
+          const progress = elapsed / sun.arcDurationMs;
+          return {
+            ...sun,
+            x: sun.startX + (sun.targetX - sun.startX) * progress,
+            y: sun.startY + sun.velocityY * elapsed + 0.5 * sun.gravity * elapsed * elapsed,
+          };
+        }
+        if (
+          sun.startY !== undefined &&
+          sun.startX !== undefined &&
+          sun.targetX !== undefined &&
+          sun.peakY !== undefined &&
+          sun.targetY !== undefined &&
+          sun.risingFrom !== undefined &&
+          sun.risingUntil !== undefined &&
+          sun.fallingUntil !== undefined
+        ) {
+          const fallSpeed = sun.fallSpeedTilesPerMs || SUN_FALL_SPEED_TILES_PER_MS;
+          if (now < sun.risingUntil) {
+            const progress = (now - sun.risingFrom) / (sun.risingUntil - sun.risingFrom);
+            return {
+              ...sun,
+              x: sun.startX + (sun.targetX - sun.startX) * progress,
+              y: sun.startY + (sun.peakY - sun.startY) * progress,
+            };
+          }
+          if (now < sun.fallingUntil) {
+            const fallDuration = (sun.targetY - sun.peakY) / fallSpeed;
+            const progress = 1 - (sun.fallingUntil - now) / fallDuration;
+            return {
+              ...sun,
+              x: sun.startX + (sun.targetX - sun.startX) * progress,
+              y: sun.peakY + (sun.targetY - sun.peakY) * progress,
+            };
+          }
+        }
+        return sun.targetY === undefined || sun.targetX === undefined ? sun : { ...sun, x: sun.targetX, y: sun.targetY };
+      });
 
     const spawnState = spawnScheduleRef.current;
     const totalRegular = currentLevel.preWaveCount + currentLevel.midCount;
@@ -255,6 +330,37 @@ export default function GameScreen() {
     const regularInterval = currentLevel.regularSpawnIntervalMs;
     const waveInterval = currentLevel.waveSpawnIntervalMs;
     const betweenDelay = currentLevel.betweenWaveDelayMs;
+
+    if (currentLevel.skySunIntervalMs && now >= nextSkySunAtRef.current) {
+      const plantableTiles = currentLevel.tiles.flatMap((tiles, row) =>
+        tiles.map((tile, col) => ({ row, col })).filter(({ row, col }) => getTileDefinition(currentLevel.tiles[row][col]).canPlant),
+      );
+      const target = plantableTiles[Math.floor(Math.random() * plantableTiles.length)];
+      if (target) {
+        const targetY = target.row + 0.25 + Math.random() * 0.5;
+        const startY = -0.5;
+        const targetX = target.col + 0.25 + Math.random() * 0.5;
+        const fallDuration = (targetY - startY) / SKY_SUN_FALL_SPEED_TILES_PER_MS;
+        nextSuns.push({
+          id: createId(),
+          row: target.row,
+          x: targetX,
+          y: startY,
+          startX: targetX,
+          targetX,
+          startY,
+          peakY: startY,
+          targetY,
+          fallSpeedTilesPerMs: SKY_SUN_FALL_SPEED_TILES_PER_MS,
+          risingFrom: now,
+          risingUntil: now,
+          fallingUntil: now + fallDuration,
+          value: SKY_SUN_VALUE,
+          expiresAt: now + SUN_LIFETIME_MS,
+        });
+      }
+      nextSkySunAtRef.current += currentLevel.skySunIntervalMs;
+    }
 
     if (!waveActiveRef.current && regularSpawnedRef.current < totalRegular && now >= spawnState.nextRegularSpawn) {
       // Spawn batch of zombies using compiled level's wave spawn batches
@@ -326,7 +432,34 @@ export default function GameScreen() {
     nextPlants = nextPlants.map((plant) => {
       if (plant.type === "sunflower" && plant.nextSunAt && now >= plant.nextSunAt) {
         const spec = PLANT_SPECS[plant.type];
-        nextSun += spec.generateAmount || 50;
+        const startY = plant.row - 0.35;
+        const startX = plant.col + 0.5;
+        const targetX = plant.col + 0.1 + Math.random() * 0.8;
+        const targetY = plant.row + 0.25 + Math.random() * 0.5;
+        const arcDurationMs = SUNFLOWER_ARC_DURATION_MS;
+        const peakHeight = SUNFLOWER_ARC_HEIGHT_TILES;
+        const verticalDelta = targetY - startY;
+        const gravity = (4 * (verticalDelta + 2 * peakHeight)) / (arcDurationMs * arcDurationMs);
+        const velocityY = -(verticalDelta + 4 * peakHeight) / arcDurationMs;
+        nextSuns.push({
+          id: createId(),
+          row: plant.row,
+          x: startX,
+          y: startY,
+          startX,
+          targetX,
+          startY,
+          targetY,
+          launchAt: now,
+          velocityY,
+          gravity,
+          arcDurationMs,
+          risingFrom: now,
+          risingUntil: now,
+          fallingUntil: now + arcDurationMs,
+          value: spec.generateAmount || 50,
+          expiresAt: now + SUN_LIFETIME_MS,
+        });
         const interval = plant.sunIntervalMs || (spec.generateMs || SUNFLOWER_GENERATION_MS);
         return {
           ...plant,
@@ -448,15 +581,16 @@ export default function GameScreen() {
       setZombiesState(nextZombies.filter((z) => z.hp > 0));
       setPlantsState(nextPlants);
       setProjectilesState(nextProjectiles);
+      setSunsState(nextSuns);
       return;
     }
 
     nextZombies = nextZombies.filter((zombie) => zombie.hp > 0);
 
-    setSunState(nextSun);
     setPlantsState(nextPlants);
     setZombiesState(nextZombies);
     setProjectilesState(nextProjectiles);
+    setSunsState(nextSuns);
 
     if (
       regularSpawnedRef.current === totalRegular &&
@@ -489,10 +623,10 @@ export default function GameScreen() {
     phase === "menu"
       ? "Plants vs Zombie Prototype"
       : phase === "level-select"
-      ? "Select a Level"
-      : currentLevel
-      ? currentLevel.title
-      : "Level";
+        ? "Select a Level"
+        : currentLevel
+          ? currentLevel.title
+          : "Level";
   const waveStageLabel = (() => {
     if (!currentLevel) return "";
     if (regularSpawnedRef.current < currentLevel.preWaveCount) {
@@ -655,11 +789,11 @@ export default function GameScreen() {
                       onClick={() => handlePlacePlant(row, col)}
                       disabled={!tile.canPlant}
                       aria-label={tile.label || "Available lawn tile"}
-                      className={`relative min-h-16 overflow-hidden rounded-2xl p-2 text-left transition ${tile.className}`}
+                      className={`relative min-h-16 overflow-hidden p-2 text-left transition ${tile.className}`}
                     >
                       {tile.label && !plant && <span className="text-xs font-semibold uppercase tracking-wide text-stone-200">{tile.label}</span>}
                       {plant && (
-                        <div className="flex h-full w-full flex-col justify-between rounded-2xl border border-lime-500/20 bg-lime-500/10 p-2 text-xs text-lime-200">
+                        <div className="flex h-full w-full flex-col justify-between border border-lime-500/20 bg-lime-500/10 p-2 text-xs text-lime-200">
                           <span>{PLANT_SPECS[plant.type].name}</span>
                           <span className="text-[11px] text-slate-200">HP: {plant.hp}</span>
                         </div>
@@ -667,6 +801,32 @@ export default function GameScreen() {
                     </button>
                   );
                 })}
+
+                {suns.map((sunDrop) => (
+                  <button
+                    key={sunDrop.id}
+                    type="button"
+                    aria-label={`Collect ${sunDrop.value} sun`}
+                    onMouseEnter={() => collectSun(sunDrop.id)}
+                    onFocus={() => collectSun(sunDrop.id)}
+                    className="absolute z-20 -translate-x-1/2 -translate-y-1/2 transition hover:scale-110"
+                    style={{
+                      left: `${(sunDrop.x / gridCols) * 100}%`,
+                      top: `${(sunDrop.y / gridRows) * 100}%`,
+                      transition: `left ${GAME_TICK_MS}ms linear, top ${GAME_TICK_MS}ms linear, transform 150ms ease-out`,
+                    }}
+                  >
+                    <img
+                      src="/sun.webp"
+                      alt=""
+                      className="block object-contain drop-shadow-lg"
+                      style={{
+                        width: `${24 + sunDrop.value * 0.36}px`,
+                        height: `${24 + sunDrop.value * 0.36}px`,
+                      }}
+                    />
+                  </button>
+                ))}
 
                 {/* Zombie overlay: render zombies absolutely so they can move smoothly (fractional x) */}
                 {zombies.map((z) => {

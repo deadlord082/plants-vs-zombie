@@ -1,4 +1,4 @@
-export type TileType = "normal" | "obstructed";
+export type TileType = "normal" | "normalDark" | "obstructed";
 
 export interface TileDefinition {
   key: TileType;
@@ -12,6 +12,11 @@ export const TILE_DEFINITIONS: Record<TileType, TileDefinition> = {
     key: "normal",
     canPlant: true,
     className: "bg-lime-700/80 hover:bg-lime-600/90",
+  },
+  normalDark: {
+    key: "normalDark",
+    canPlant: true,
+    className: "bg-green-800/90 hover:bg-green-700/90",
   },
   obstructed: {
     key: "obstructed",

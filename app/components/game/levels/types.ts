@@ -17,6 +17,7 @@ export interface LevelDefinition {
   regularSpawnIntervalMs: number;
   betweenWaveDelayMs: number;
   waveSpawnIntervalMs: number;
+  skySunIntervalMs?: number;
   tiles: TileType[][];
   // Waves of pre-boss spawns (each sub-array spawns together, separate arrays are separated by regularSpawnIntervalMs)
   waves: ZombieSpawn[][];
@@ -35,6 +36,7 @@ export interface CompiledLevelConfig {
   regularSpawnIntervalMs: number;
   betweenWaveDelayMs: number;
   waveSpawnIntervalMs: number;
+  skySunIntervalMs?: number;
   tiles: TileType[][];
   // Total pre-wave zombies
   preWaveCount: number;

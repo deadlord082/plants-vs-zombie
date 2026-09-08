@@ -8,6 +8,7 @@ export const LEVEL_3: LevelDefinition = {
   regularSpawnIntervalMs: 30000,
   betweenWaveDelayMs: 3000,
   waveSpawnIntervalMs: 1200,
+  skySunIntervalMs: 10000,
   tiles: [
     ["normal", "normal", "normal", "normal", "normal", "normal", "normal", "normal", "normal", "normal"],
     ["normal", "normal", "normal", "normal", "normal", "normal", "normal", "normal", "normal", "normal"],
