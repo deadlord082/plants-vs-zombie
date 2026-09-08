@@ -8,6 +8,14 @@ export const LEVEL_2: LevelDefinition = {
   regularSpawnIntervalMs: 30000,
   betweenWaveDelayMs: 3000,
   waveSpawnIntervalMs: 1200,
+  tiles: [
+    ["obstructed", "normal", "normal", "normal", "normal", "normal", "normal", "normal", "normal", "normal", "normal", "normal"],
+    ["obstructed", "normal", "normal", "normal", "normal", "normal", "normal", "normal", "normal", "normal", "normal", "normal"],
+    ["obstructed", "normal", "normal", "normal", "normal", "normal", "normal", "normal", "normal", "normal", "normal", "normal"],
+    ["obstructed", "normal", "normal", "normal", "normal", "normal", "normal", "normal", "normal", "normal", "normal", "normal"],
+    ["obstructed", "normal", "normal", "normal", "normal", "normal", "normal", "normal", "normal", "normal", "normal", "normal"],
+    ["obstructed", "normal", "normal", "normal", "normal", "normal", "normal", "normal", "normal", "normal", "normal", "normal"],
+  ],
   // Waves: each batch spawns together, separated by regularSpawnIntervalMs
   waves: [
     [{ type: "basic", count: 1 }],

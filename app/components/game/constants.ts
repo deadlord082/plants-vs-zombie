@@ -1,7 +1,5 @@
 import type { LevelConfig, PlantSpec, PlantTypeKey } from "./types";
 
-export const GRID_COLS = 12;
-export const GRID_ROWS = 6;
 export const INITIAL_SUN = 50;
 export const ZOMBIE_HP = 200;
 export const ZOMBIE_MOVE_MS = 6500;

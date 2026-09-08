@@ -2,8 +2,6 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  GRID_COLS,
-  GRID_ROWS,
   INITIAL_SUN,
   PLANT_SPECS,
   PROJECTILE_SPEED_PER_TICK,
@@ -28,12 +26,14 @@ import type {
   ZombieInstance,
 } from "./types";
 import { LEVELS } from "./levels";
+import { getTileDefinition } from "./tiles";
 
 const createId = () => Math.random().toString(36).slice(2, 9);
 
 const tileKey = (row: number, col: number) => `${row}-${col}`;
 
-const randomRow = () => Math.floor(Math.random() * GRID_ROWS);
+const getGridRows = (level: LevelConfig | null) => level?.tiles.length || 0;
+const getGridCols = (level: LevelConfig | null) => level?.tiles[0]?.length || 0;
 
 const randomizeInterval = (interval: number): number => {
   const variance = 1 + (Math.random() - 0.5) * 0.2;
@@ -166,6 +166,8 @@ export default function GameScreen() {
 
   const handlePlacePlant = (row: number, col: number) => {
     if (phase !== "playing") return;
+    const tile = currentLevelRef.current?.tiles[row]?.[col] || "normal";
+    if (!getTileDefinition(tile).canPlant) return;
     const now = Date.now();
     if (plantsRef.current.some((plant) => plant.row === row && plant.col === col)) return;
     const spec = PLANT_SPECS[selectedPlant];
@@ -197,11 +199,13 @@ export default function GameScreen() {
   const spawnZombie = (isWave: boolean, type: string = "basic") => {
     const now = Date.now();
     const spec = ZOMBIE_SPECS[type] || ZOMBIE_SPECS.basic;
+    const gridCols = getGridCols(currentLevelRef.current);
+    const gridRows = getGridRows(currentLevelRef.current);
     const newZombie: ZombieInstance = {
       id: createId(),
-      row: randomRow(),
-      col: GRID_COLS - 1,
-      x: GRID_COLS + ZOMBIE_SPAWN_OFFSET,
+      row: Math.floor(Math.random() * gridRows),
+      col: gridCols - 1,
+      x: gridCols + ZOMBIE_SPAWN_OFFSET,
       hp: spec.hp,
       armor: spec.armor,
       lastMoveAt: now,
@@ -237,6 +241,8 @@ export default function GameScreen() {
     if (phase !== "playing" || currentLevel === null) return;
 
     const now = gameTime;
+    const gridCols = getGridCols(currentLevel);
+    const gridRows = getGridRows(currentLevel);
     let nextPlants = plantsRef.current.slice();
     let nextZombies = zombiesRef.current.slice();
     let nextProjectiles = projectilesRef.current.slice();
@@ -254,16 +260,11 @@ export default function GameScreen() {
       // Spawn batch of zombies using compiled level's wave spawn batches
       if (compiledLevelRef.current && spawnState.batchIndex < compiledLevelRef.current.waveSpawns.length) {
         const batch = compiledLevelRef.current.waveSpawns[spawnState.batchIndex];
-        // Spawn all zombies in this batch (spread across rows)
-        let rowIndex = 0;
+        // Spawn every zombie at a random row from the active level.
         for (const zombieSpawn of batch) {
-          // Cycle through rows to spread the batch
-          const row = rowIndex % GRID_ROWS;
           const newZ = spawnZombie(false, zombieSpawn.type);
-          newZ.row = row;
           nextZombies.push(newZ);
           regularSpawnedRef.current += 1;
-          rowIndex += 1;
         }
         setRegularSpawned(regularSpawnedRef.current);
         spawnState.batchIndex += 1;
@@ -337,7 +338,7 @@ export default function GameScreen() {
         const spec = PLANT_SPECS[plant.type];
         // Only shoot if there's at least one zombie ahead in the same row AND within grid bounds
         const anyAhead = zombiesRef.current.some(
-          (z) => z.row === plant.row && z.x > plant.col && z.x >= 0 && z.x < GRID_COLS && z.hp > 0
+          (z) => z.row === plant.row && z.x > plant.col && z.x >= 0 && z.x < gridCols && z.hp > 0
         );
         if (anyAhead) {
           const shot: Projectile = {
@@ -385,7 +386,7 @@ export default function GameScreen() {
       }
 
       // keep projectile alive while it's roughly within screen bounds
-      if (moved.x < GRID_COLS + 5) {
+      if (moved.x < gridCols + 5) {
         acc.push(moved);
       }
       return acc;
@@ -470,11 +471,13 @@ export default function GameScreen() {
 
   const grid = useMemo(
     () =>
-      Array.from({ length: GRID_ROWS }, (_, row) =>
-        Array.from({ length: GRID_COLS }, (_, col) => ({ row, col })),
+      Array.from({ length: getGridRows(currentLevel) }, (_, row) =>
+        Array.from({ length: getGridCols(currentLevel) }, (_, col) => ({ row, col })),
       ),
-    [],
+    [currentLevel],
   );
+  const gridRows = getGridRows(currentLevel);
+  const gridCols = getGridCols(currentLevel);
 
   const selectedSpec = PLANT_SPECS[selectedPlant];
   const progressMax = currentLevel ? currentLevel.preWaveCount + currentLevel.midCount : 1;
@@ -518,7 +521,7 @@ export default function GameScreen() {
         {phase === "menu" && (
           <div className="mt-12 flex flex-col items-center gap-6">
             <p className="max-w-2xl text-lg text-slate-300">
-              This prototype includes a simple menu, a level selection screen, a 12x6 lawn grid, sun currency, two plant types, and a basic zombie wave system.
+              This prototype includes a simple menu, a level selection screen, configurable lawn grids, sun currency, two plant types, and a basic zombie wave system.
             </p>
             <button
               type="button"
@@ -640,18 +643,21 @@ export default function GameScreen() {
             </div>
 
             <div className="overflow-hidden rounded-3xl border border-slate-700 bg-slate-900/90 p-4 shadow-xl">
-              <div className="relative grid gap-1 bg-slate-950 p-1 sm:p-2" style={{ gridTemplateColumns: `repeat(${GRID_COLS}, minmax(0, 1fr))` }}>
+              <div className="relative grid gap-1 bg-slate-950 p-1 sm:p-2" style={{ gridTemplateColumns: `repeat(${gridCols}, minmax(0, 1fr))` }}>
                 {grid.flat().map(({ row, col }) => {
                   const plant = plants.find((item) => item.row === row && item.col === col);
+                  const tile = getTileDefinition(currentLevel?.tiles[row]?.[col] || "normal");
 
                   return (
                     <button
                       key={tileKey(row, col)}
                       type="button"
                       onClick={() => handlePlacePlant(row, col)}
-                      className={`relative min-h-16 overflow-hidden rounded-2xl border p-2 text-left transition ${"border-slate-800 bg-slate-950/80 hover:border-lime-400"}`}
+                      disabled={!tile.canPlant}
+                      aria-label={tile.label || "Available lawn tile"}
+                      className={`relative min-h-16 overflow-hidden rounded-2xl p-2 text-left transition ${tile.className}`}
                     >
-                      <div className="absolute inset-x-0 top-0 h-1 bg-slate-800" />
+                      {tile.label && !plant && <span className="text-xs font-semibold uppercase tracking-wide text-stone-200">{tile.label}</span>}
                       {plant && (
                         <div className="flex h-full w-full flex-col justify-between rounded-2xl border border-lime-500/20 bg-lime-500/10 p-2 text-xs text-lime-200">
                           <span>{PLANT_SPECS[plant.type].name}</span>
@@ -678,8 +684,8 @@ export default function GameScreen() {
                       key={z.id}
                       className="absolute pointer-events-none"
                       style={{
-                        left: `${(z.x / GRID_COLS) * 100}%`,
-                        top: `${((z.row + 0.5) / GRID_ROWS) * 100}%`,
+                        left: `${(z.x / gridCols) * 100}%`,
+                        top: `${((z.row + 0.5) / gridRows) * 100}%`,
                         transform: "translate(-50%, -50%)",
                         transition: `left ${GAME_TICK_MS}ms linear, top ${GAME_TICK_MS}ms linear`,
                       }}
@@ -698,8 +704,8 @@ export default function GameScreen() {
                     key={p.id}
                     className="absolute pointer-events-none"
                     style={{
-                      left: `${(p.x / GRID_COLS) * 100}%`,
-                      top: `${((p.row + 0.5) / GRID_ROWS) * 100}%`,
+                      left: `${(p.x / gridCols) * 100}%`,
+                      top: `${((p.row + 0.5) / gridRows) * 100}%`,
                       transform: "translate(-50%, -50%)",
                       transition: `left ${GAME_TICK_MS}ms linear, top ${GAME_TICK_MS}ms linear`,
                     }}

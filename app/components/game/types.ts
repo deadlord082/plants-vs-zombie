@@ -1,5 +1,6 @@
 export type PlantTypeKey = "sunflower" | "peaShooter";
 export type GamePhase = "menu" | "level-select" | "playing" | "complete";
+import type { TileType } from "./tiles";
 
 export interface LevelConfig {
   id: number;
@@ -13,6 +14,7 @@ export interface LevelConfig {
   regularSpawnIntervalMs: number;
   betweenWaveDelayMs: number;
   waveSpawnIntervalMs: number;
+  tiles: TileType[][];
 }
 
 export interface PlantSpec {

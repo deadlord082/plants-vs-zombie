@@ -8,6 +8,14 @@ export const LEVEL_1: LevelDefinition = {
   regularSpawnIntervalMs: 30000,
   betweenWaveDelayMs: 3000,
   waveSpawnIntervalMs: 1200,
+  tiles: [
+    ["normal", "normal", "normal", "normal", "normal", "normal", "normal", "normal", "normal", "normal", "normal", "normal"],
+    ["normal", "normal", "normal", "normal", "normal", "normal", "normal", "normal", "normal", "normal", "normal", "normal"],
+    ["normal", "normal", "normal", "normal", "normal", "normal", "normal", "normal", "normal", "normal", "normal", "normal"],
+    ["normal", "normal", "normal", "normal", "normal", "normal", "normal", "normal", "normal", "normal", "normal", "normal"],
+    ["normal", "normal", "normal", "normal", "normal", "normal", "normal", "normal", "normal", "normal", "normal", "normal"],
+    ["normal", "normal", "normal", "normal", "normal", "normal", "normal", "normal", "normal", "normal", "normal", "normal"],
+  ],
   // Waves: each batch spawns together, separated by regularSpawnIntervalMs
   waves: [
     [{ type: "basic", count: 1 }],
@@ -23,8 +31,9 @@ export const LEVEL_1: LevelDefinition = {
   bossWaves: [
     // Boss wave 1: Big wave with basics and cones
     [
-      { type: "basic", count: 10 },
+      { type: "basic", count: 5 },
       { type: "cone", count: 5 },
+      { type: "basic", count: 5 },
     ],
   ],
 };

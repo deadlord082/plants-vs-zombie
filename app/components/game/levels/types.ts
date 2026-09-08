@@ -2,6 +2,8 @@
  * Level definition types for easy level creation
  */
 
+import type { TileType } from "../tiles";
+
 export interface ZombieSpawn {
   type: "basic" | "imp" | "cone";
   count: number;
@@ -15,6 +17,7 @@ export interface LevelDefinition {
   regularSpawnIntervalMs: number;
   betweenWaveDelayMs: number;
   waveSpawnIntervalMs: number;
+  tiles: TileType[][];
   // Waves of pre-boss spawns (each sub-array spawns together, separate arrays are separated by regularSpawnIntervalMs)
   waves: ZombieSpawn[][];
   // Boss waves (harder waves that spawn after main waves)
@@ -32,6 +35,7 @@ export interface CompiledLevelConfig {
   regularSpawnIntervalMs: number;
   betweenWaveDelayMs: number;
   waveSpawnIntervalMs: number;
+  tiles: TileType[][];
   // Total pre-wave zombies
   preWaveCount: number;
   // Total zombies in each boss wave

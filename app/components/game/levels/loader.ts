@@ -1,10 +1,19 @@
 import type { LevelConfig } from "../types";
 import type { CompiledLevelConfig, LevelDefinition } from "./types";
 
+const validateTileMap = (tiles: LevelDefinition["tiles"], levelId: number) => {
+  const width = tiles[0]?.length || 0;
+  if (width === 0 || tiles.some((row) => row.length !== width)) {
+    throw new Error(`Level ${levelId} must define a non-empty rectangular tile map.`);
+  }
+};
+
 /**
  * Compiles a level definition into a game-usable format
  */
 export function compileLevelDefinition(def: LevelDefinition): CompiledLevelConfig {
+  validateTileMap(def.tiles, def.id);
+
   // Calculate total pre-wave zombies
   const preWaveCount = def.waves.reduce((sum, batch) => sum + batch.reduce((batchSum, spawn) => batchSum + spawn.count, 0), 0);
 
@@ -49,6 +58,7 @@ export function compileLevelDefinition(def: LevelDefinition): CompiledLevelConfi
     regularSpawnIntervalMs: def.regularSpawnIntervalMs,
     betweenWaveDelayMs: def.betweenWaveDelayMs,
     waveSpawnIntervalMs: def.waveSpawnIntervalMs,
+    tiles: def.tiles,
     preWaveCount,
     wave1Count,
     midCount,
@@ -75,5 +85,6 @@ export function toLevelConfig(compiled: CompiledLevelConfig): LevelConfig {
     regularSpawnIntervalMs: compiled.regularSpawnIntervalMs,
     betweenWaveDelayMs: compiled.betweenWaveDelayMs,
     waveSpawnIntervalMs: compiled.waveSpawnIntervalMs,
+    tiles: compiled.tiles,
   };
 }
