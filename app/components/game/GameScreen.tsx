@@ -33,7 +33,7 @@ import type {
   ZombieInstance,
 } from "./types";
 import { LEVELS } from "./levels";
-import { getTileDefinition } from "./tiles";
+import { getTileDefinition, TILE_DEFINITIONS } from "./tiles";
 
 const createId = () => Math.random().toString(36).slice(2, 9);
 
@@ -41,6 +41,9 @@ const tileKey = (row: number, col: number) => `${row}-${col}`;
 
 const getGridRows = (level: LevelConfig | null) => level?.tiles.length || 0;
 const getGridCols = (level: LevelConfig | null) => level?.tiles[0]?.length || 0;
+const SEED_BANK_SIZE = 6;
+const AVAILABLE_PLANT_KEYS = Object.keys(PLANT_SPECS) as PlantTypeKey[];
+type AlmanacCategory = "plants" | "zombies" | "tiles";
 
 const randomizeInterval = (interval: number): number => {
   const variance = 1 + (Math.random() - 0.5) * 0.2;
@@ -50,6 +53,10 @@ const randomizeInterval = (interval: number): number => {
 export default function GameScreen() {
   const [phase, setPhase] = useState<GamePhase>("menu");
   const [selectedPlant, setSelectedPlant] = useState<PlantTypeKey>("sunflower");
+  const [selectedLoadout, setSelectedLoadout] = useState<PlantTypeKey[]>([]);
+  const [almanacCategory, setAlmanacCategory] = useState<AlmanacCategory>("plants");
+  const [shovelSelected, setShovelSelected] = useState(false);
+  const [isPaused, setIsPaused] = useState(false);
   const [selectedLevelId, setSelectedLevelId] = useState(1);
   const [currentLevel, setCurrentLevel] = useState<LevelConfig | null>(null);
   const [sun, setSun] = useState(INITIAL_SUN);
@@ -141,6 +148,8 @@ export default function GameScreen() {
     setWaveActive(false);
     waveActiveRef.current = false;
     setPlantReadyState({ sunflower: 0, peaShooter: 0 });
+    setShovelSelected(false);
+    setIsPaused(false);
     setLevelComplete(false);
     setGameOver(false);
     gameOverRef.current = false;
@@ -157,15 +166,40 @@ export default function GameScreen() {
     currentLevelRef.current = levelToStart;
     compiledLevelRef.current = compiledLevel;
     spawnScheduleRef.current = {
-      nextRegularSpawn: now + levelToStart.initialDelayMs,
+      nextRegularSpawn: now,
       nextWaveStart: 0,
       nextWaveSpawn: 0,
       nextWaveNumber: 1,
       batchIndex: 0,
     };
-    nextSkySunAtRef.current = levelToStart.skySunIntervalMs ? now + levelToStart.skySunIntervalMs : 0;
+    nextSkySunAtRef.current = 0;
+    setGameTime(now);
+    setIsPaused(false);
+    setSelectedLoadout([]);
+    setPhase("loadout");
+  };
+
+  const beginLevel = () => {
+    if (!currentLevelRef.current || selectedLoadout.length === 0) return;
+    const now = Date.now();
+    spawnScheduleRef.current = {
+      nextRegularSpawn: now + currentLevelRef.current.initialDelayMs,
+      nextWaveStart: 0,
+      nextWaveSpawn: 0,
+      nextWaveNumber: 1,
+      batchIndex: 0,
+    };
+    nextSkySunAtRef.current = currentLevelRef.current.skySunIntervalMs ? now + currentLevelRef.current.skySunIntervalMs : 0;
     setGameTime(now);
     setPhase("playing");
+  };
+
+  const toggleLoadoutPlant = (plantKey: PlantTypeKey) => {
+    setSelectedLoadout((current) => {
+      if (current.includes(plantKey)) return current.filter((key) => key !== plantKey);
+      if (current.length >= SEED_BANK_SIZE) return current;
+      return [...current, plantKey];
+    });
   };
 
   const returnToMenu = () => {
@@ -184,10 +218,18 @@ export default function GameScreen() {
 
   const handlePlacePlant = (row: number, col: number) => {
     if (phase !== "playing") return;
+    const existingPlant = plantsRef.current.find((plant) => plant.row === row && plant.col === col);
+    if (shovelSelected) {
+      if (existingPlant) {
+        setPlantsState(plantsRef.current.filter((plant) => plant.id !== existingPlant.id));
+        setShovelSelected(false);
+      }
+      return;
+    }
     const tile = currentLevelRef.current?.tiles[row]?.[col] || "normal";
     if (!getTileDefinition(tile).canPlant) return;
     const now = Date.now();
-    if (plantsRef.current.some((plant) => plant.row === row && plant.col === col)) return;
+    if (existingPlant) return;
     const spec = PLANT_SPECS[selectedPlant];
     if (sunRef.current < spec.cost) return;
     if (plantReadyRef.current[selectedPlant] > now) return;
@@ -244,7 +286,7 @@ export default function GameScreen() {
   };
 
   useEffect(() => {
-    if (phase !== "playing" || gameOver) {
+    if (phase !== "playing" || gameOver || isPaused) {
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
         intervalRef.current = null;
@@ -261,7 +303,7 @@ export default function GameScreen() {
         clearInterval(intervalRef.current);
       }
     };
-  }, [phase, gameOver]);
+  }, [phase, gameOver, isPaused]);
 
   useEffect(() => {
     const handleDebugKey = (event: KeyboardEvent) => {
@@ -275,7 +317,7 @@ export default function GameScreen() {
   }, []);
 
   useEffect(() => {
-    if (phase !== "playing" || currentLevel === null) return;
+    if (phase !== "playing" || currentLevel === null || isPaused) return;
 
     const now = gameTime;
     const gridCols = getGridCols(currentLevel);
@@ -613,7 +655,7 @@ export default function GameScreen() {
     ) {
       finishLevel();
     }
-  }, [gameTime, phase, currentLevel]);
+  }, [gameTime, phase, currentLevel, isPaused]);
 
   const grid = useMemo(
     () =>
@@ -625,20 +667,24 @@ export default function GameScreen() {
   const gridRows = getGridRows(currentLevel);
   const gridCols = getGridCols(currentLevel);
 
-  const selectedSpec = PLANT_SPECS[selectedPlant];
-  const progressMax = currentLevel ? currentLevel.preWaveCount + currentLevel.midCount : 1;
-  const progressPercent = currentLevel ? Math.round((regularSpawned / progressMax) * 100) : 0;
+  const progressMax = currentLevel
+    ? currentLevel.preWaveCount + currentLevel.midCount + currentLevel.wave1Count + currentLevel.wave2Count
+    : 1;
+  const zombiesSent = regularSpawned + wave1Spawned + wave2Spawned;
+  const progressPercent = currentLevel ? Math.round((zombiesSent / progressMax) * 100) : 0;
   const waveThresholds = currentLevel
     ? [currentLevel.preWaveCount].concat(currentLevel.midCount > 0 ? [currentLevel.preWaveCount + currentLevel.midCount] : [])
     : [];
   const title =
     phase === "menu"
-      ? "Plants vs Zombie Prototype"
+      ? "Plants vs. Zombies"
       : phase === "level-select"
         ? "Select a Level"
-        : currentLevel
-          ? currentLevel.title
-          : "Level";
+        : phase === "almanac"
+          ? "Almanac"
+          : currentLevel
+            ? currentLevel.title
+            : "Level";
   const waveStageLabel = (() => {
     if (!currentLevel) return "";
     if (regularSpawnedRef.current < currentLevel.preWaveCount) {
@@ -658,6 +704,15 @@ export default function GameScreen() {
     }
     return "";
   })();
+  const compiledCurrentLevel = currentLevel ? getCompiledLevel(currentLevel.id) : null;
+  const zombieTypes = compiledCurrentLevel
+    ? Array.from(
+      new Set([
+        ...compiledCurrentLevel.waveSpawns.flat().map((zombie) => zombie.type),
+        ...compiledCurrentLevel.bossWaveSequences.flat().map((zombie) => zombie.type),
+      ]),
+    )
+    : [];
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 px-4 py-8 sm:px-8">
@@ -665,127 +720,122 @@ export default function GameScreen() {
         <h1 className="text-4xl font-bold tracking-tight text-lime-300">{title}</h1>
 
         {phase === "menu" && (
-          <div className="mt-12 flex flex-col items-center gap-6">
-            <p className="max-w-2xl text-lg text-slate-300">
-              This prototype includes a simple menu, a level selection screen, configurable lawn grids, sun currency, two plant types, and a basic zombie wave system.
-            </p>
-            <button
-              type="button"
-              onClick={() => setPhase("level-select")}
-              className="rounded-full bg-lime-500 px-7 py-3 text-lg font-semibold text-slate-950 transition hover:bg-lime-400"
-            >
-              Start Game
-            </button>
+          <div className="main-menu">
+            <div className="menu-sunburst" aria-hidden="true"><img src="/sun.webp" alt="" /></div>
+            <p className="menu-kicker">Welcome to the lawn</p>
+            <h2>Choose your defense</h2>
+            <p className="menu-copy">Plant wisely, collect sun, and stop the zombie waves before they reach the house.</p>
+            <div className="menu-actions">
+              <button type="button" onClick={() => setPhase("level-select")} className="menu-primary">Start Game <span>→</span></button>
+              <button type="button" onClick={() => setPhase("almanac")} className="menu-secondary">Open Almanac <span>▣</span></button>
+            </div>
           </div>
         )}
 
         {phase === "level-select" && (
-          <div className="mt-12 grid gap-6 sm:grid-cols-2">
-            {LEVELS.map((level) => (
-              <div key={level.id} className="rounded-3xl border border-slate-700 bg-slate-900/80 p-6 shadow-xl">
-                <div className="flex items-center justify-between gap-4">
-                  <div>
-                    <h2 className="text-2xl font-semibold text-white">{level.title}</h2>
-                    <p className="mt-2 text-slate-400">{level.description}</p>
+          <div className="level-select-screen">
+            <div className="screen-heading"><div><p className="menu-kicker">The backyard awaits</p><h2>Select a Level</h2><p>Each lawn brings a different layout and wave pattern.</p></div><button type="button" onClick={() => setPhase("menu")} className="text-button">Back</button></div>
+            <div className="level-card-grid">
+              {LEVELS.map((level) => (
+                <div key={level.id} className="level-card">
+                  <div className="level-card-number">{String(level.id).padStart(2, "0")}</div>
+                  <div className="level-card-content">
+                    <div>
+                      <h2 className="text-2xl font-semibold text-white">{level.title}</h2>
+                      <p>{level.description}</p>
+                    </div>
+                    <div className="level-card-actions">
+                      <button type="button" onClick={() => startLevel(level.id)} className="menu-primary">Play Level <span>→</span></button>
+                      <button type="button" onClick={() => setSelectedLevelId(level.id)} className={`level-preview-button ${selectedLevelId === level.id ? "active" : ""}`}>{selectedLevelId === level.id ? "Selected" : "Preview"}</button>
+                    </div>
                   </div>
-                  <span className="rounded-full bg-lime-500 px-3 py-1 text-sm font-semibold text-slate-950">{level.id}</span>
                 </div>
-                <div className="mt-6 flex flex-col gap-3">
-                  <button
-                    type="button"
-                    onClick={() => startLevel(level.id)}
-                    className="rounded-full bg-lime-500 px-5 py-3 font-semibold text-slate-950 transition hover:bg-lime-400"
-                  >
-                    Play {level.title}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setSelectedLevelId(level.id)}
-                    className={`rounded-full border px-4 py-2 text-sm font-semibold transition ${selectedLevelId === level.id ? "border-lime-400 bg-slate-800 text-white" : "border-slate-700 bg-slate-900 text-slate-300 hover:border-lime-300"}`}
-                  >
-                    Select for preview
-                  </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {phase === "almanac" && (
+          <div className="almanac-screen">
+            <div className="screen-heading"><div><p className="menu-kicker">Know your tools</p><h2>Almanac</h2><p>Everything discovered on the lawn, in one place.</p></div><button type="button" onClick={() => setPhase("menu")} className="text-button">Back to menu</button></div>
+            <div className="almanac-tabs" role="tablist" aria-label="Almanac categories">
+              {(["plants", "zombies", "tiles"] as AlmanacCategory[]).map((category) => <button key={category} type="button" role="tab" aria-selected={almanacCategory === category} onClick={() => setAlmanacCategory(category)} className={almanacCategory === category ? "active" : ""}>{category}</button>)}
+            </div>
+            <div className="almanac-grid">
+              {almanacCategory === "plants" && Object.values(PLANT_SPECS).map((spec) => <article key={spec.key} className="almanac-card"><div className="almanac-art plant-art"><img src={spec.key === "peaShooter" ? "/plant_peashooter.webp" : "/sunflower.webp"} alt="" /></div><div><p className="almanac-type">Plant</p><h3>{spec.name}</h3><p>{spec.summary}</p><dl><div><dt>Cost</dt><dd>{spec.cost} sun</dd></div><div><dt>Health</dt><dd>{spec.hp} HP</dd></div><div><dt>Recharge</dt><dd>{spec.rechargeMs / 1000}s</dd></div>{spec.damage && <div><dt>Damage</dt><dd>{spec.damage}</dd></div>}</dl></div></article>)}
+              {almanacCategory === "zombies" && Object.values(ZOMBIE_SPECS).map((spec) => <article key={spec.key} className="almanac-card"><div className="almanac-art zombie-art">{spec.key === "basic" ? <img src="/zombie.webp" alt="" /> : <span className={`zombie-placeholder ${spec.key}`}>{spec.key === "imp" ? "IMP" : "CONE"}</span>}</div><div><p className="almanac-type">Zombie</p><h3>{spec.name}</h3><p>{spec.summary}</p><dl><div><dt>Health</dt><dd>{spec.hp} HP</dd></div><div><dt>Speed</dt><dd>{Math.round(spec.moveMs / 100) / 10}s / tile</dd></div><div><dt>Damage</dt><dd>{spec.damage}</dd></div><div><dt>Armor</dt><dd>{spec.armor}</dd></div></dl></div></article>)}
+              {almanacCategory === "tiles" && Object.values(TILE_DEFINITIONS).map((tile) => <article key={tile.key} className="almanac-card tile-card"><div className={`almanac-tile-swatch ${tile.key}`} /><div><p className="almanac-type">Tile</p><h3>{tile.key === "normalDark" ? "Dark lawn" : tile.key === "normal" ? "Lawn" : "Obstructed"}</h3><p>{tile.description}</p><dl><div><dt>Plantable</dt><dd>{tile.canPlant ? "Yes" : "No"}</dd></div><div><dt>Label</dt><dd>{tile.label || "None"}</dd></div></dl></div></article>)}
+            </div>
+          </div>
+        )}
+
+        {phase === "loadout" && currentLevel && (
+          <div className="loadout-screen">
+            <section className="loadout-plants">
+              <div className="loadout-heading">
+                <div>
+                  <p className="loadout-kicker">Prepare your defense</p>
+                  <h2>{currentLevel.title}</h2>
+                  <p>{currentLevel.description}</p>
                 </div>
+                <div className="loadout-count">{selectedLoadout.length} / {SEED_BANK_SIZE}</div>
               </div>
-            ))}
+              <div className="plant-choice-grid">
+                {AVAILABLE_PLANT_KEYS.map((plantKey) => {
+                  const spec = PLANT_SPECS[plantKey];
+                  const selected = selectedLoadout.includes(plantKey);
+                  return (
+                    <button key={plantKey} type="button" onClick={() => toggleLoadoutPlant(plantKey)} className={`plant-choice ${selected ? "selected" : ""}`} aria-pressed={selected}>
+                      <div className="plant-choice-image"><img src={plantKey === "peaShooter" ? "/plant_peashooter.webp" : "/sunflower.webp"} alt="" /></div>
+                      <div><h3>{spec.name}</h3><p>{spec.cost} sun</p></div>
+                      <span className="plant-choice-check">{selected ? "✓" : "+"}</span>
+                    </button>
+                  );
+                })}
+              </div>
+              <div className="loadout-seed-preview">
+                {Array.from({ length: SEED_BANK_SIZE }).map((_, index) => {
+                  const plantKey = selectedLoadout[index];
+                  return <div key={`preview-${index}`} className={`preview-slot ${plantKey ? "filled" : ""}`}>{plantKey && <img src={plantKey === "peaShooter" ? "/plant_peashooter.webp" : "/sunflower.webp"} alt={PLANT_SPECS[plantKey].name} />}</div>;
+                })}
+              </div>
+            </section>
+            <aside className="loadout-zombies">
+              <div className="loadout-heading"><div><p className="loadout-kicker">Incoming threats</p><h2>Zombies</h2></div><span className="zombie-count">{zombieTypes.length}</span></div>
+              <div className="zombie-choice-list">
+                {zombieTypes.map((zombieType) => {
+                  const zombieLabel = zombieType === "basic" ? "Basic zombie" : zombieType === "imp" ? "Imp" : "Conehead zombie";
+                  return <div key={zombieType} className="zombie-choice">{zombieType === "basic" ? <img src="/zombie.webp" alt="" /> : <span className={`zombie-placeholder ${zombieType}`}>{zombieType === "imp" ? "IMP" : "CONE"}</span>}<div><strong>{zombieLabel}</strong></div></div>;
+                })}
+              </div>
+            </aside>
+            <button type="button" className="start-level-button" disabled={selectedLoadout.length === 0} onClick={beginLevel}>Start level <span>→</span></button>
           </div>
         )}
 
         {(phase === "playing" || phase === "complete") && (
-          <div className="mt-10 space-y-6">
-            <div className="grid gap-4 rounded-3xl border border-slate-700 bg-slate-900/80 p-6 shadow-xl sm:grid-cols-[1fr_auto]">
-              <div className="space-y-4">
-                <div className="flex flex-wrap items-center gap-4">
-                  <div className="rounded-2xl bg-slate-800/90 px-4 py-3 text-slate-100">
-                    Sun: <span className="font-semibold text-lime-300">{sun}</span>
-                  </div>
-                  <div className="rounded-2xl bg-slate-800/90 px-4 py-3 text-slate-100">
-                    Selected: <span className="font-semibold text-lime-300">{selectedSpec.name}</span>
-                  </div>
-                </div>
-
-                <div className="grid gap-4 sm:grid-cols-2">
-                  {Object.values(PLANT_SPECS).map((spec) => {
-                    const ready = plantReadyRef.current[spec.key] <= gameTime;
-                    const enoughSun = sunRef.current >= spec.cost;
-                    const disabled = !ready || !enoughSun;
-                    const coolDown = Math.max(0, Math.ceil((plantReadyRef.current[spec.key] - gameTime) / 1000));
-                    return (
-                      <button
-                        key={spec.key}
-                        type="button"
-                        disabled={disabled}
-                        onClick={() => setSelectedPlant(spec.key)}
-                        className={`rounded-3xl border px-4 py-4 text-left transition ${selectedPlant === spec.key ? "border-lime-400 bg-slate-800" : "border-slate-700 bg-slate-900/80"} ${disabled ? "cursor-not-allowed opacity-70" : "hover:border-lime-300"}`}
-                      >
-                        <div className="flex items-center justify-between gap-3">
-                          <div>
-                            <h3 className="text-lg font-semibold text-white">{spec.name}</h3>
-                            <p className="mt-1 text-sm text-slate-400">{spec.summary}</p>
-                          </div>
-                          <div className="rounded-full bg-slate-800 px-3 py-1 text-sm text-lime-300">{spec.cost}☀</div>
-                        </div>
-                        <div className="mt-3 text-sm text-slate-300">
-                          {ready ? "Ready to place" : `Recharge ${coolDown}s`}
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
+          <div className="mt-6 space-y-4">
+            <div className="game-toolbar">
+              <div className="sun-counter" aria-label={`${sun} sun available`}><img src="/sun.webp" alt="" /> <strong>{sun}</strong></div>
+              <div className="seed-tray" aria-label="Seed packet selection">
+                {selectedLoadout.map((plantKey) => {
+                  const spec = PLANT_SPECS[plantKey];
+                  const ready = plantReadyRef.current[spec.key] <= gameTime;
+                  const enoughSun = sunRef.current >= spec.cost;
+                  const disabled = !ready || !enoughSun;
+                  const coolDown = Math.max(0, Math.ceil((plantReadyRef.current[spec.key] - gameTime) / 1000));
+                  return (
+                    <button key={spec.key} type="button" aria-label={`${spec.name}, costs ${spec.cost} sun`} onClick={() => { setSelectedPlant(spec.key); setShovelSelected(false); }} className={`seed-slot ${selectedPlant === spec.key && !shovelSelected ? "selected" : ""} ${disabled ? "unavailable" : ""}`}>
+                      <img src={spec.key === "peaShooter" ? "/plant_peashooter.webp" : "/sunflower.webp"} alt="" />
+                      <span>{spec.cost}</span>
+                      {!ready && <small>{coolDown}s</small>}
+                    </button>
+                  );
+                })}
+                {Array.from({ length: Math.max(0, SEED_BANK_SIZE - selectedLoadout.length) }).map((_, index) => <div key={`empty-${index}`} className="seed-slot empty" aria-hidden="true" />)}
               </div>
-
-              <div className="space-y-4 rounded-3xl bg-slate-950/90 p-4">
-                <div className="text-sm uppercase tracking-[0.24em] text-slate-400">Progress</div>
-                <div className="relative h-4 overflow-hidden rounded-full bg-slate-800">
-                  <div className="h-full bg-lime-400 transition-all" style={{ width: `${Math.min(100, progressPercent)}%` }} />
-                  {waveThresholds.map((threshold, index) => (
-                    <div
-                      key={`${threshold}-${index}`}
-                      className="absolute inset-y-0 w-px bg-orange-500"
-                      style={{ left: `${Math.min(100, Math.round((threshold / progressMax) * 100))}%` }}
-                    />
-                  ))}
-                </div>
-                <div className="flex items-center justify-between text-sm text-slate-300">
-                  <span>{regularSpawned} / {progressMax} regular zombies sent</span>
-                  <span className="flex items-center gap-1 text-lime-300">🚩 {waveThresholds.length} wave marker{waveThresholds.length === 1 ? "" : "s"}</span>
-                </div>
-                <div className="rounded-3xl border border-slate-700 bg-slate-900/80 p-4 text-sm text-slate-300">
-                  <div className="font-semibold text-white">Wave status</div>
-                  <p className="mt-2">{waveStageLabel}</p>
-                  <p className="mt-2 text-sm text-slate-400">
-                    {currentLevel && currentLevel.wave1Count > 0 && `First wave: ${currentLevel.wave1Count} zombies.`}
-                    {currentLevel && currentLevel.wave2Count > 0 && ` Second wave: ${currentLevel.wave2Count} zombies.`}
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={returnToMenu}
-                  className="rounded-full bg-slate-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-600"
-                >
-                  Back to menu
-                </button>
-              </div>
+              <button type="button" aria-label="Select shovel" onClick={() => setShovelSelected((selected) => !selected)} className={`shovel-button ${shovelSelected ? "selected" : ""}`}>⌁<span>Shovel</span></button>
+              <button type="button" aria-label="Open pause menu" onClick={() => setIsPaused(true)} className="settings-button">⚙</button>
             </div>
 
             <div className="overflow-hidden rounded-3xl border border-slate-700 bg-slate-900/90 p-4 shadow-xl">
@@ -920,9 +970,26 @@ export default function GameScreen() {
                 ))}
               </div>
             </div>
+
+            <div className="wave-progress" aria-label={`Zombie progress: ${zombiesSent} of ${progressMax} sent`}>
+              <div className="wave-progress-label"><span>Zombie attack</span><span>{zombiesSent} / {progressMax}</span></div>
+              <div className="wave-progress-track"><div className="wave-progress-fill" style={{ width: `${Math.min(100, progressPercent)}%` }} />{waveThresholds.map((threshold, index) => <i key={`${threshold}-${index}`} style={{ left: `${Math.min(100, Math.round((threshold / progressMax) * 100))}%` }} />)}</div>
+              <p>{waveStageLabel}</p>
+            </div>
           </div>
         )}
       </div>
+
+      {isPaused && phase === "playing" && (
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/60 px-4">
+          <div className="pause-menu">
+            <h2>Paused</h2>
+            <button type="button" onClick={() => setIsPaused(false)}>Resume</button>
+            <button type="button" onClick={() => currentLevelRef.current && startLevel(currentLevelRef.current.id)}>Restart level</button>
+            <button type="button" onClick={returnToMenu}>Return to main menu</button>
+          </div>
+        </div>
+      )}
 
       {levelComplete && phase !== "menu" && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/90 px-4 py-8">

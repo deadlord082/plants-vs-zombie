@@ -44,6 +44,8 @@ export const PLANT_SPECS: Record<PlantTypeKey, PlantSpec> = {
 
 export interface ZombieSpec {
   key: string;
+  name: string;
+  summary: string;
   hp: number;
   moveMs: number;
   attackMs: number;
@@ -54,6 +56,8 @@ export interface ZombieSpec {
 export const ZOMBIE_SPECS: Record<string, ZombieSpec> = {
   basic: {
     key: "basic",
+    name: "Basic Zombie",
+    summary: "A steady walker that advances toward the house and attacks plants at close range.",
     hp: ZOMBIE_HP,
     moveMs: ZOMBIE_MOVE_MS,
     attackMs: ZOMBIE_ATTACK_MS,
@@ -62,6 +66,8 @@ export const ZOMBIE_SPECS: Record<string, ZombieSpec> = {
   },
   imp: {
     key: "imp",
+    name: "Imp",
+    summary: "A smaller, faster zombie that reaches the lawn sooner but has less health.",
     hp: 120,
     moveMs: Math.round(ZOMBIE_MOVE_MS / 1.5),
     attackMs: ZOMBIE_ATTACK_MS,
@@ -70,6 +76,8 @@ export const ZOMBIE_SPECS: Record<string, ZombieSpec> = {
   },
   cone: {
     key: "cone",
+    name: "Conehead Zombie",
+    summary: "A durable zombie protected by a traffic cone that absorbs extra damage.",
     hp: ZOMBIE_HP,
     moveMs: ZOMBIE_MOVE_MS,
     attackMs: ZOMBIE_ATTACK_MS,

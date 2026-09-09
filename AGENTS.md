@@ -5,15 +5,15 @@
 This is a remake of the game plants vs zombie.
 In this game each level can have differrent zombie, tiles an event for each level.
 
-<!-- END:nextjs-agent-rules -->
-
 ## Project Context
 
 This repository is a Next.js remake of Plants vs. Zombies. The main game screen is implemented in `app/components/game/GameScreen.tsx`, with gameplay constants and plant/zombie specifications in `app/components/game/constants.ts`.
 
 ### Game Logic
 
-- The game has menu, level selection, playing, complete, and game-over phases.
+- The game has menu, level selection, loadout, Almanac, playing, complete, and game-over phases.
+- Starting a level from level selection opens the loadout screen first. Gameplay must not begin until the player selects at least one plant and clicks Start level.
+- The loadout screen shows selectable plants, a level-specific roster of distinct zombie types, and a configurable seed bank. Keep the bank capacity in `SEED_BANK_SIZE` so future seed-slot upgrades can increase it without changing the UI structure.
 - Players spend sun to plant sunflowers and pea shooters on available lawn tiles.
 - Sunflowers generate sun over time. Pea shooters fire projectiles at zombies in the same row.
 - Zombies move from the right toward the house, attack plants when they reach them, and cause game over when they cross the left boundary.
@@ -42,6 +42,13 @@ Each level must define a rectangular `tiles` matrix in its own level file:
 - Waves contain regular zombie batches. `bossWaves` contains the later wave sequences.
 - Set `skySunIntervalMs` only for levels that should have periodic sky suns; omit it for levels without sky drops.
 
+### Menu and Almanac UI
+
+- The main menu includes navigation to level selection and the Almanac.
+- The Almanac has Plants, Zombies, and Tiles categories. Render its entries from `PLANT_SPECS`, `ZOMBIE_SPECS`, and `TILE_DEFINITIONS` rather than duplicating gameplay data in the UI.
+- Plant specs include player-facing summaries and gameplay stats. Zombie specs include `name` and `summary` alongside combat stats. Tile definitions include a `description` alongside planting rules and visual classes.
+- Keep zombie statistics out of the level loadout roster; the Almanac is the place for detailed zombie stats and descriptions.
+
 ### Tile System
 
 Tile types are declared in `app/components/game/tiles.ts`. Each tile definition owns its visual classes and whether plants can be placed on it.
@@ -66,3 +73,5 @@ Tile types are declared in `app/components/game/tiles.ts`. Each tile definition 
 - Preserve the existing level-definition and tile-registry patterns when adding gameplay features.
 - Keep level-specific behavior in level data when possible rather than hard-coding level IDs in `GameScreen.tsx`.
 - Run `npm run lint` after changes. Use `npm run build` for production validation when the local npm environment is available.
+
+<!-- END:nextjs-agent-rules -->

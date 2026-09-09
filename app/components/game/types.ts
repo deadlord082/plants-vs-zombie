@@ -1,5 +1,5 @@
 export type PlantTypeKey = "sunflower" | "peaShooter";
-export type GamePhase = "menu" | "level-select" | "playing" | "complete";
+export type GamePhase = "menu" | "level-select" | "loadout" | "almanac" | "playing" | "complete";
 import type { TileType } from "./tiles";
 
 export interface LevelConfig {
