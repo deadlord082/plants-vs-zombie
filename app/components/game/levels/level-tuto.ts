@@ -8,8 +8,9 @@ export const LEVEL_TUTO: LevelDefinition = {
   regularSpawnIntervalMs: 30000,
   betweenWaveDelayMs: 3000,
   waveSpawnIntervalMs: 1200,
+  skySunIntervalMs: 10000,
   tiles: [
-    ["normal", "normalDark", "normal", "normalDark", "normal", "normalDark", "normal", "normalDark", "normal", "normalDark", "normal", "normalDark"],
+    ["normal", "normalDark", "normal", "normalDark", "normal", "normalDark", "normal", "normalDark"],
   ],
   // Waves: each batch spawns together, separated by regularSpawnIntervalMs
   waves: [

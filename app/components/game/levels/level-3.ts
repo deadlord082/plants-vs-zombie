@@ -10,10 +10,10 @@ export const LEVEL_3: LevelDefinition = {
   waveSpawnIntervalMs: 1200,
   skySunIntervalMs: 10000,
   tiles: [
-    ["normal", "normal", "normal", "normal", "normal", "normal", "normal", "normal", "normal", "normal"],
-    ["normal", "normal", "normal", "normal", "normal", "normal", "normal", "normal", "normal", "normal"],
-    ["normal", "normal", "normal", "normal", "normal", "normal", "normal", "normal", "normal", "normal"],
-    ["normal", "normal", "normal", "normal", "normal", "normal", "normal", "normal", "normal", "normal"],
+    ["normal", "normal", "normal", "normal", "normal", "normal"],
+    ["normal", "normal", "normal", "normal", "normal", "normal"],
+    ["normal", "normal", "normal", "normal", "normal", "normal"],
+    ["normal", "normal", "normal", "normal", "normal", "normal"],
   ],
   // Waves: each batch spawns together, separated by regularSpawnIntervalMs
   waves: [

@@ -52,6 +52,15 @@ Tile types are declared in `app/components/game/tiles.ts`. Each tile definition 
 - Keep tile rendering square and avoid adding rounded corners to lawn cells.
 - Plant placement must always consult the tile definition before spending sun or creating a plant.
 
+### Visual Assets & Debug UI
+
+- Pea projectiles render with the transparent asset at `public/projectile-pea.webp`; previous green-dot rendering remains commented in code as an immediate fallback if per-projectile image loading proves unreliable.
+- Sun drops pulse for the last 5 seconds before they disappear, matching the original Plants vs. Zombies urgency effect.
+- Plant sprites are loaded from `public/sunflower.webp` and `public/plant_peashooter.webp` when available. If an image fails to load, the original text-based tile fallback remains visible instead of breaking the UI.
+- Basic zombies render from `public/zombie.webp`. The sprite should be scaled larger than the original placeholder but kept from expanding downward; it should grow upward and sideways while staying grounded at the bottom edge.
+- Plant image tiles should not render the old bordered container when the sprite is present; the image should visually fill the tile area more cleanly.
+- The project uses a debug-only health overlay: press `H` to toggle health text for all plants and zombies, defaulting to hidden.
+
 ### Development Guidelines
 
 - Preserve the existing level-definition and tile-registry patterns when adding gameplay features.

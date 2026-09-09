@@ -68,6 +68,7 @@ export default function GameScreen() {
   const [gameTime, setGameTime] = useState(Date.now());
   const [levelComplete, setLevelComplete] = useState(false);
   const [gameOver, setGameOver] = useState(false);
+  const [showDebugHealth, setShowDebugHealth] = useState(false);
 
   const plantsRef = useRef<PlantInstance[]>([]);
   const zombiesRef = useRef<ZombieInstance[]>([]);
@@ -261,6 +262,17 @@ export default function GameScreen() {
       }
     };
   }, [phase, gameOver]);
+
+  useEffect(() => {
+    const handleDebugKey = (event: KeyboardEvent) => {
+      if (event.key.toLowerCase() === "h" && !event.repeat) {
+        setShowDebugHealth((visible) => !visible);
+      }
+    };
+
+    window.addEventListener("keydown", handleDebugKey);
+    return () => window.removeEventListener("keydown", handleDebugKey);
+  }, []);
 
   useEffect(() => {
     if (phase !== "playing" || currentLevel === null) return;
@@ -793,9 +805,22 @@ export default function GameScreen() {
                     >
                       {tile.label && !plant && <span className="text-xs font-semibold uppercase tracking-wide text-stone-200">{tile.label}</span>}
                       {plant && (
-                        <div className="flex h-full w-full flex-col justify-between border border-lime-500/20 bg-lime-500/10 p-2 text-xs text-lime-200">
-                          <span>{PLANT_SPECS[plant.type].name}</span>
-                          <span className="text-[11px] text-slate-200">HP: {plant.hp}</span>
+                        <div className="relative h-full w-full text-xs text-lime-200">
+                          <img
+                            src={plant.type === "peaShooter" ? "/plant_peashooter.webp" : "/sunflower.webp"}
+                            alt={PLANT_SPECS[plant.type].name}
+                            className="absolute inset-0 h-full w-full scale-125 object-contain"
+                            onError={(event) => {
+                              event.currentTarget.remove();
+                              event.currentTarget.nextElementSibling?.classList.remove("hidden");
+                              event.currentTarget.parentElement?.querySelector("[data-image-debug-health]")?.classList.add("hidden");
+                            }}
+                          />
+                          <div className="relative z-10 hidden h-full w-full flex-col justify-between border border-lime-500/20 bg-lime-500/10 p-2">
+                            <span>{PLANT_SPECS[plant.type].name}</span>
+                            {showDebugHealth && <span className="text-[11px] text-slate-200">HP: {plant.hp}</span>}
+                          </div>
+                          {showDebugHealth && <span data-image-debug-health className="absolute bottom-0 left-1/2 z-10 -translate-x-1/2 text-[11px] text-slate-200">HP: {plant.hp}</span>}
                         </div>
                       )}
                     </button>
@@ -809,7 +834,7 @@ export default function GameScreen() {
                     aria-label={`Collect ${sunDrop.value} sun`}
                     onMouseEnter={() => collectSun(sunDrop.id)}
                     onFocus={() => collectSun(sunDrop.id)}
-                    className="absolute z-20 -translate-x-1/2 -translate-y-1/2 transition hover:scale-110"
+                    className={`absolute z-20 -translate-x-1/2 -translate-y-1/2 transition hover:scale-110 ${sunDrop.expiresAt - gameTime > 0 && sunDrop.expiresAt - gameTime <= 5000 ? "animate-pulse" : ""}`}
                     style={{
                       left: `${(sunDrop.x / gridCols) * 100}%`,
                       top: `${(sunDrop.y / gridRows) * 100}%`,
@@ -850,10 +875,24 @@ export default function GameScreen() {
                         transition: `left ${GAME_TICK_MS}ms linear, top ${GAME_TICK_MS}ms linear`,
                       }}
                     >
-                      <div className={`rounded-full ${bgColor} px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-white`}>{zombieLabel}</div>
-                      <div className="mt-1 text-[10px] text-white text-center bg-rose-500/80 rounded-full px-2 py-0.5">
-                        HP: {z.hp}{z.armor > 0 ? ` | A: ${z.armor}` : ""}
-                      </div>
+                      {z.type === "basic" ? (
+                        <>
+                          <img
+                            src="/zombie.webp"
+                            alt="Basic zombie"
+                            className="h-20 w-20 origin-bottom object-contain"
+                            style={{ transform: "scale(1.1)" }}
+                            onError={(event) => {
+                              event.currentTarget.remove();
+                              event.currentTarget.nextElementSibling?.classList.remove("hidden");
+                            }}
+                          />
+                          <div className={`hidden rounded-full ${bgColor} px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-white`}>{zombieLabel}</div>
+                        </>
+                      ) : (
+                        <div className={`rounded-full ${bgColor} px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-white`}>{zombieLabel}</div>
+                      )}
+                      {showDebugHealth && <div className="mt-1 text-[10px] text-white text-center bg-rose-500/80 rounded-full px-2 py-0.5">HP: {z.hp}{z.armor > 0 ? ` | A: ${z.armor}` : ""}</div>}
                     </div>
                   );
                 })}
@@ -865,12 +904,18 @@ export default function GameScreen() {
                     className="absolute pointer-events-none"
                     style={{
                       left: `${(p.x / gridCols) * 100}%`,
-                      top: `${((p.row + 0.5) / gridRows) * 100}%`,
+                      top: `${((p.row + 0.3) / gridRows) * 100}%`,
                       transform: "translate(-50%, -50%)",
                       transition: `left ${GAME_TICK_MS}ms linear, top ${GAME_TICK_MS}ms linear`,
                     }}
                   >
-                    <div className="h-2 w-2 rounded-full bg-cyan-300" />
+                    <img
+                      src="/projectile-pea.webp"
+                      alt=""
+                      className="block h-5 w-5 object-contain"
+                    />
+                    {/* Previous projectile rendering, kept as a fallback if per-projectile images affect loading. */}
+                    {/* <div className="h-2 w-2 rounded-full bg-cyan-300" /> */}
                   </div>
                 ))}
               </div>
