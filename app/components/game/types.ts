@@ -1,5 +1,5 @@
 export type PlantTypeKey = "sunflower" | "peaShooter";
-export type GamePhase = "menu" | "level-select" | "loadout" | "almanac" | "playing" | "complete";
+export type GamePhase = "menu" | "level-select" | "shop" | "loadout" | "almanac" | "playing" | "complete";
 import type { TileType } from "./tiles";
 
 export interface LevelConfig {
@@ -87,4 +87,14 @@ export interface SunInstance {
   risingFrom?: number;
   risingUntil?: number;
   fallingUntil?: number;
+}
+
+export interface CoinInstance {
+  id: string;
+  row: number;
+  x: number;
+  y: number;
+  value: number;
+  image: string;
+  expiresAt: number;
 }

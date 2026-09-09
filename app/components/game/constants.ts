@@ -46,6 +46,7 @@ export interface ZombieSpec {
   key: string;
   name: string;
   summary: string;
+  coinDropChance: number;
   hp: number;
   moveMs: number;
   attackMs: number;
@@ -58,6 +59,7 @@ export const ZOMBIE_SPECS: Record<string, ZombieSpec> = {
     key: "basic",
     name: "Basic Zombie",
     summary: "A steady walker that advances toward the house and attacks plants at close range.",
+    coinDropChance: 0.01,
     hp: ZOMBIE_HP,
     moveMs: ZOMBIE_MOVE_MS,
     attackMs: ZOMBIE_ATTACK_MS,
@@ -68,6 +70,7 @@ export const ZOMBIE_SPECS: Record<string, ZombieSpec> = {
     key: "imp",
     name: "Imp",
     summary: "A smaller, faster zombie that reaches the lawn sooner but has less health.",
+    coinDropChance: 0.01,
     hp: 120,
     moveMs: Math.round(ZOMBIE_MOVE_MS / 1.5),
     attackMs: ZOMBIE_ATTACK_MS,
@@ -78,6 +81,7 @@ export const ZOMBIE_SPECS: Record<string, ZombieSpec> = {
     key: "cone",
     name: "Conehead Zombie",
     summary: "A durable zombie protected by a traffic cone that absorbs extra damage.",
+    coinDropChance: 0.02,
     hp: ZOMBIE_HP,
     moveMs: ZOMBIE_MOVE_MS,
     attackMs: ZOMBIE_ATTACK_MS,

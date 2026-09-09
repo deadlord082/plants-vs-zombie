@@ -13,12 +13,30 @@ This repository is a Next.js remake of Plants vs. Zombies. The main game screen 
 
 - The game has menu, level selection, loadout, Almanac, playing, complete, and game-over phases.
 - Starting a level from level selection opens the loadout screen first. Gameplay must not begin until the player selects at least one plant and clicks Start level.
-- The loadout screen shows selectable plants, a level-specific roster of distinct zombie types, and a configurable seed bank. Keep the bank capacity in `SEED_BANK_SIZE` so future seed-slot upgrades can increase it without changing the UI structure.
+- The loadout screen shows selectable unlocked plants, a level-specific roster of distinct zombie types, and a configurable seed bank. Keep the bank capacity in player data so future seed-slot upgrades can increase it without changing the UI structure.
 - Players spend sun to plant sunflowers and pea shooters on available lawn tiles.
 - Sunflowers generate sun over time. Pea shooters fire projectiles at zombies in the same row.
 - Zombies move from the right toward the house, attack plants when they reach them, and cause game over when they cross the left boundary.
 - Zombie spawning is controlled by each level's regular waves and boss waves. Zombie rows must be selected randomly using the active level's row count.
 - Keep gameplay state and simulation updates in `GameScreen.tsx` unless a new abstraction clearly belongs elsewhere.
+
+### Player Progression and Money
+
+- Persist player progression in browser `localStorage` under the `plants-vs-zombie-player` key. The stored player data contains integer `money`, `unlockedPlants`, completed level IDs, `seedBankSize`, and `seedSlotsPurchased`.
+- A new player starts with zero money, only the `peaShooter` unlocked, no completed levels, and the initial six seed slots.
+- Completing tutorial level ID `0` unlocks `sunflower`. Completing levels 1, 2, and 3 awards `$100`, `$200`, and `$300` respectively.
+- Completion rewards and plant unlocks are granted only the first time a level is completed. Replaying a completed level must not grant its reward again, though the level remains playable.
+- The level selector displays completed levels, and the main menu displays the player's money and seed capacity.
+- The Shop offers exactly two one-time seed-slot purchases: the first costs `$50,000`, and the second costs `$80,000`. Once both are purchased, no further seed-slot purchase is available.
+- Money must remain a non-negative integer. Collectible coin money is added to the same persisted player balance.
+
+### Zombie Coin Drops
+
+- Coin-drop chances belong in each zombie's `ZombieSpec` definition in `app/components/game/constants.ts`, using a `coinDropChance` field. Do not maintain a separate drop-chance map in `GameScreen.tsx`.
+- Basic zombies and imps have a `0.01` drop chance; conehead zombies have a `0.02` drop chance.
+- Each defeated zombie may roll for at most one coin drop. A successful drop has a 20% chance to be gold worth `$20`, otherwise it is silver worth `$10`.
+- Use `/public/silver-coin.webp` for silver coins and `/public/gold-coin.png` for gold coins. Coins are collectible by mouse hover or keyboard focus and expire after 15 seconds.
+- Coin drops are separate from sun drops and must not affect the sun counter. Keep coin motion, expiration, collection, and money synchronization in `GameScreen.tsx`.
 
 ### Sun System
 

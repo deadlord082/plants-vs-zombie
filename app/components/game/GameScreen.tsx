@@ -28,6 +28,7 @@ import type {
   LevelConfig,
   PlantInstance,
   PlantTypeKey,
+  CoinInstance,
   Projectile,
   SunInstance,
   ZombieInstance,
@@ -41,9 +42,26 @@ const tileKey = (row: number, col: number) => `${row}-${col}`;
 
 const getGridRows = (level: LevelConfig | null) => level?.tiles.length || 0;
 const getGridCols = (level: LevelConfig | null) => level?.tiles[0]?.length || 0;
-const SEED_BANK_SIZE = 6;
-const AVAILABLE_PLANT_KEYS = Object.keys(PLANT_SPECS) as PlantTypeKey[];
+const INITIAL_SEED_BANK_SIZE = 6;
+const SEED_SLOT_COSTS = [50000, 80000];
+const COIN_LIFETIME_MS = 15000;
+const PLAYER_DATA_STORAGE_KEY = "plants-vs-zombie-player";
+const DEFAULT_PLAYER_DATA: PlayerData = {
+  money: 0,
+  unlockedPlants: ["peaShooter"],
+  completedLevels: [],
+  seedBankSize: INITIAL_SEED_BANK_SIZE,
+  seedSlotsPurchased: 0,
+};
 type AlmanacCategory = "plants" | "zombies" | "tiles";
+
+interface PlayerData {
+  money: number;
+  unlockedPlants: PlantTypeKey[];
+  completedLevels: number[];
+  seedBankSize: number;
+  seedSlotsPurchased: number;
+}
 
 const randomizeInterval = (interval: number): number => {
   const variance = 1 + (Math.random() - 0.5) * 0.2;
@@ -52,7 +70,7 @@ const randomizeInterval = (interval: number): number => {
 
 export default function GameScreen() {
   const [phase, setPhase] = useState<GamePhase>("menu");
-  const [selectedPlant, setSelectedPlant] = useState<PlantTypeKey>("sunflower");
+  const [selectedPlant, setSelectedPlant] = useState<PlantTypeKey>("peaShooter");
   const [selectedLoadout, setSelectedLoadout] = useState<PlantTypeKey[]>([]);
   const [almanacCategory, setAlmanacCategory] = useState<AlmanacCategory>("plants");
   const [shovelSelected, setShovelSelected] = useState(false);
@@ -64,6 +82,7 @@ export default function GameScreen() {
   const [zombies, setZombies] = useState<ZombieInstance[]>([]);
   const [projectiles, setProjectiles] = useState<Projectile[]>([]);
   const [suns, setSuns] = useState<SunInstance[]>([]);
+  const [coins, setCoins] = useState<CoinInstance[]>([]);
   const [regularSpawned, setRegularSpawned] = useState(0);
   const [wave1Spawned, setWave1Spawned] = useState(0);
   const [wave2Spawned, setWave2Spawned] = useState(0);
@@ -76,11 +95,15 @@ export default function GameScreen() {
   const [levelComplete, setLevelComplete] = useState(false);
   const [gameOver, setGameOver] = useState(false);
   const [showDebugHealth, setShowDebugHealth] = useState(false);
+  const [playerData, setPlayerData] = useState<PlayerData>(DEFAULT_PLAYER_DATA);
+  const [playerDataLoaded, setPlayerDataLoaded] = useState(false);
+  const [rewardMessage, setRewardMessage] = useState("");
 
   const plantsRef = useRef<PlantInstance[]>([]);
   const zombiesRef = useRef<ZombieInstance[]>([]);
   const projectilesRef = useRef<Projectile[]>([]);
   const sunsRef = useRef<SunInstance[]>([]);
+  const coinsRef = useRef<CoinInstance[]>([]);
   const sunRef = useRef(INITIAL_SUN);
   const regularSpawnedRef = useRef(0);
   const wave1SpawnedRef = useRef(0);
@@ -102,6 +125,46 @@ export default function GameScreen() {
   });
   const nextSkySunAtRef = useRef(0);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const playerDataRef = useRef<PlayerData>(DEFAULT_PLAYER_DATA);
+  const completionHandledRef = useRef(false);
+  const defeatedZombieIdsRef = useRef(new Set<string>());
+
+  useEffect(() => {
+    try {
+      const stored = window.localStorage.getItem(PLAYER_DATA_STORAGE_KEY);
+      if (stored) {
+        const parsed = JSON.parse(stored) as Partial<PlayerData>;
+        const storedMoney = typeof parsed.money === "number" ? parsed.money : 0;
+        const storedSeedBankSize = typeof parsed.seedBankSize === "number" ? parsed.seedBankSize : INITIAL_SEED_BANK_SIZE;
+        const storedSeedSlotsPurchased = typeof parsed.seedSlotsPurchased === "number"
+          ? parsed.seedSlotsPurchased
+          : storedSeedBankSize - INITIAL_SEED_BANK_SIZE;
+        const unlockedPlants = Array.isArray(parsed.unlockedPlants)
+          ? parsed.unlockedPlants.filter((key): key is PlantTypeKey => key === "peaShooter" || key === "sunflower")
+          : DEFAULT_PLAYER_DATA.unlockedPlants;
+        const loadedData: PlayerData = {
+          money: Number.isInteger(storedMoney) && storedMoney >= 0 ? storedMoney : 0,
+          unlockedPlants: Array.from(new Set(["peaShooter", ...unlockedPlants])) as PlantTypeKey[],
+          completedLevels: Array.isArray(parsed.completedLevels)
+            ? parsed.completedLevels.filter((levelId): levelId is number => Number.isInteger(levelId) && levelId >= 0)
+            : [],
+          seedBankSize: INITIAL_SEED_BANK_SIZE + Math.min(2, Math.max(0, Number.isInteger(storedSeedSlotsPurchased) ? storedSeedSlotsPurchased : 0)),
+          seedSlotsPurchased: Math.min(2, Math.max(0, Number.isInteger(storedSeedSlotsPurchased) ? storedSeedSlotsPurchased : 0)),
+        };
+        playerDataRef.current = loadedData;
+        setPlayerData(loadedData);
+      }
+    } catch {
+      window.localStorage.removeItem(PLAYER_DATA_STORAGE_KEY);
+    }
+    setPlayerDataLoaded(true);
+  }, []);
+
+  useEffect(() => {
+    if (playerDataLoaded) {
+      window.localStorage.setItem(PLAYER_DATA_STORAGE_KEY, JSON.stringify(playerData));
+    }
+  }, [playerData, playerDataLoaded]);
 
   const setPlantsState = (next: PlantInstance[]) => {
     plantsRef.current = next;
@@ -123,6 +186,11 @@ export default function GameScreen() {
     setSuns(next);
   };
 
+  const setCoinsState = (next: CoinInstance[]) => {
+    coinsRef.current = next;
+    setCoins(next);
+  };
+
   const setSunState = (next: number) => {
     sunRef.current = next;
     setSun(next);
@@ -139,6 +207,7 @@ export default function GameScreen() {
     setZombiesState([]);
     setProjectilesState([]);
     setSunsState([]);
+    setCoinsState([]);
     setRegularSpawned(0);
     regularSpawnedRef.current = 0;
     setWave1Spawned(0);
@@ -151,8 +220,11 @@ export default function GameScreen() {
     setShovelSelected(false);
     setIsPaused(false);
     setLevelComplete(false);
+    setRewardMessage("");
     setGameOver(false);
     gameOverRef.current = false;
+    completionHandledRef.current = false;
+    defeatedZombieIdsRef.current.clear();
   };
 
   const startLevel = (levelId: number) => {
@@ -197,7 +269,7 @@ export default function GameScreen() {
   const toggleLoadoutPlant = (plantKey: PlantTypeKey) => {
     setSelectedLoadout((current) => {
       if (current.includes(plantKey)) return current.filter((key) => key !== plantKey);
-      if (current.length >= SEED_BANK_SIZE) return current;
+      if (current.length >= playerDataRef.current.seedBankSize) return current;
       return [...current, plantKey];
     });
   };
@@ -212,8 +284,42 @@ export default function GameScreen() {
   };
 
   const finishLevel = () => {
+    if (!currentLevelRef.current || completionHandledRef.current) return;
+    completionHandledRef.current = true;
+    const levelId = currentLevelRef.current.id;
+    const alreadyCompleted = playerDataRef.current.completedLevels.includes(levelId);
+    if (!alreadyCompleted) {
+      const reward = levelId === 0 ? 0 : levelId * 100;
+      const nextData: PlayerData = {
+        ...playerDataRef.current,
+        money: playerDataRef.current.money + reward,
+        unlockedPlants: levelId === 0
+          ? Array.from(new Set([...playerDataRef.current.unlockedPlants, "sunflower"]))
+          : playerDataRef.current.unlockedPlants,
+        completedLevels: [...playerDataRef.current.completedLevels, levelId],
+      };
+      playerDataRef.current = nextData;
+      setPlayerData(nextData);
+      setRewardMessage(levelId === 0 ? "Sunflower unlocked!" : `Reward: $${reward}`);
+    } else {
+      setRewardMessage("This level has already been completed.");
+    }
     setPhase("complete");
     setLevelComplete(true);
+  };
+
+  const buySeedSlot = () => {
+    const purchaseIndex = playerDataRef.current.seedSlotsPurchased;
+    const cost = SEED_SLOT_COSTS[purchaseIndex];
+    if (cost === undefined || playerDataRef.current.money < cost) return;
+    const nextData = {
+      ...playerDataRef.current,
+      money: playerDataRef.current.money - cost,
+      seedBankSize: playerDataRef.current.seedBankSize + 1,
+      seedSlotsPurchased: purchaseIndex + 1,
+    };
+    playerDataRef.current = nextData;
+    setPlayerData(nextData);
   };
 
   const handlePlacePlant = (row: number, col: number) => {
@@ -262,6 +368,19 @@ export default function GameScreen() {
     if (!collectedSun) return;
     setSunsState(sunsRef.current.filter((item) => item.id !== sunId));
     setSunState(sunRef.current + collectedSun.value);
+  };
+
+  const collectCoin = (coinId: string) => {
+    if (phase !== "playing") return;
+    const collectedCoin = coinsRef.current.find((coin) => coin.id === coinId);
+    if (!collectedCoin) return;
+    setCoinsState(coinsRef.current.filter((coin) => coin.id !== coinId));
+    const nextData = {
+      ...playerDataRef.current,
+      money: playerDataRef.current.money + collectedCoin.value,
+    };
+    playerDataRef.current = nextData;
+    setPlayerData(nextData);
   };
 
   const spawnZombie = (isWave: boolean, type: string = "basic") => {
@@ -376,6 +495,7 @@ export default function GameScreen() {
         }
         return sun.targetY === undefined || sun.targetX === undefined ? sun : { ...sun, x: sun.targetX, y: sun.targetY };
       });
+    let nextCoins = coinsRef.current.filter((coin) => coin.expiresAt > now);
 
     const spawnState = spawnScheduleRef.current;
     const totalRegular = currentLevel.preWaveCount + currentLevel.midCount;
@@ -625,6 +745,23 @@ export default function GameScreen() {
       return { ...zombie, x: newX };
     });
 
+    nextZombies.forEach((zombie) => {
+      if (zombie.hp > 0 || defeatedZombieIdsRef.current.has(zombie.id)) return;
+      defeatedZombieIdsRef.current.add(zombie.id);
+      const dropChance = ZOMBIE_SPECS[zombie.type]?.coinDropChance || 0;
+      if (Math.random() >= dropChance) return;
+      const isGold = Math.random() < 0.2;
+      nextCoins.push({
+        id: createId(),
+        row: zombie.row,
+        x: zombie.x,
+        y: zombie.row + 0.35,
+        value: isGold ? 20 : 10,
+        image: isGold ? "/gold-coin.png" : "/silver-coin.webp",
+        expiresAt: now + COIN_LIFETIME_MS,
+      });
+    });
+
     nextPlants = nextPlants.filter((plant) => plant.hp > 0);
     // Check for game over: any zombie that crosses the left trigger X
     const anyReachedEnd = nextZombies.some((z) => z.x <= ZOMBIE_LEFT_TRIGGER_X);
@@ -636,6 +773,7 @@ export default function GameScreen() {
       setPlantsState(nextPlants);
       setProjectilesState(nextProjectiles);
       setSunsState(nextSuns);
+      setCoinsState(nextCoins);
       return;
     }
 
@@ -645,6 +783,7 @@ export default function GameScreen() {
     setZombiesState(nextZombies);
     setProjectilesState(nextProjectiles);
     setSunsState(nextSuns);
+    setCoinsState(nextCoins);
 
     if (
       regularSpawnedRef.current === totalRegular &&
@@ -680,11 +819,13 @@ export default function GameScreen() {
       ? "Plants vs. Zombies"
       : phase === "level-select"
         ? "Select a Level"
-        : phase === "almanac"
-          ? "Almanac"
-          : currentLevel
-            ? currentLevel.title
-            : "Level";
+        : phase === "shop"
+          ? "Shop"
+          : phase === "almanac"
+            ? "Almanac"
+            : currentLevel
+              ? currentLevel.title
+              : "Level";
   const waveStageLabel = (() => {
     if (!currentLevel) return "";
     if (regularSpawnedRef.current < currentLevel.preWaveCount) {
@@ -725,8 +866,13 @@ export default function GameScreen() {
             <p className="menu-kicker">Welcome to the lawn</p>
             <h2>Choose your defense</h2>
             <p className="menu-copy">Plant wisely, collect sun, and stop the zombie waves before they reach the house.</p>
+            <div className="mb-6 flex items-center justify-center gap-5 text-lg font-semibold text-amber-200">
+              <span>Money: ${playerData.money}</span>
+              <span>Seed slots: {playerData.seedBankSize}</span>
+            </div>
             <div className="menu-actions">
               <button type="button" onClick={() => setPhase("level-select")} className="menu-primary">Start Game <span>→</span></button>
+              <button type="button" onClick={() => setPhase("shop")} className="menu-secondary">Shop <span>◆</span></button>
               <button type="button" onClick={() => setPhase("almanac")} className="menu-secondary">Open Almanac <span>▣</span></button>
             </div>
           </div>
@@ -748,9 +894,29 @@ export default function GameScreen() {
                       <button type="button" onClick={() => startLevel(level.id)} className="menu-primary">Play Level <span>→</span></button>
                       <button type="button" onClick={() => setSelectedLevelId(level.id)} className={`level-preview-button ${selectedLevelId === level.id ? "active" : ""}`}>{selectedLevelId === level.id ? "Selected" : "Preview"}</button>
                     </div>
+                    {playerData.completedLevels.includes(level.id) && <span className="mt-3 inline-block font-semibold text-lime-300">Completed</span>}
                   </div>
                 </div>
               ))}
+            </div>
+          </div>
+        )}
+
+        {phase === "shop" && (
+          <div className="level-select-screen">
+            <div className="screen-heading"><div><p className="menu-kicker">Improve your defense</p><h2>Shop</h2><p>Spend your level rewards to expand your seed bank.</p></div><button type="button" onClick={() => setPhase("menu")} className="text-button">Back to menu</button></div>
+            <div className="level-card max-w-xl">
+              <div className="level-card-number">+</div>
+              <div className="level-card-content">
+                <div>
+                  <h2 className="text-2xl font-semibold text-white">New seed slot</h2>
+                  <p>Add one more plant to every loadout. Current capacity: {playerData.seedBankSize}.</p>
+                  <p className="mt-2 font-semibold text-amber-200">Price: ${SEED_SLOT_COSTS[playerData.seedSlotsPurchased] || "-"} | Balance: ${playerData.money}</p>
+                </div>
+                <button type="button" onClick={buySeedSlot} disabled={playerData.seedSlotsPurchased >= SEED_SLOT_COSTS.length || playerData.money < (SEED_SLOT_COSTS[playerData.seedSlotsPurchased] || Infinity)} className="menu-primary disabled:cursor-not-allowed disabled:opacity-50">
+                  {playerData.seedSlotsPurchased >= SEED_SLOT_COSTS.length ? "All slots purchased" : "Buy slot"}
+                </button>
+              </div>
             </div>
           </div>
         )}
@@ -778,10 +944,10 @@ export default function GameScreen() {
                   <h2>{currentLevel.title}</h2>
                   <p>{currentLevel.description}</p>
                 </div>
-                <div className="loadout-count">{selectedLoadout.length} / {SEED_BANK_SIZE}</div>
+                <div className="loadout-count">{selectedLoadout.length} / {playerData.seedBankSize}</div>
               </div>
               <div className="plant-choice-grid">
-                {AVAILABLE_PLANT_KEYS.map((plantKey) => {
+                {playerData.unlockedPlants.map((plantKey) => {
                   const spec = PLANT_SPECS[plantKey];
                   const selected = selectedLoadout.includes(plantKey);
                   return (
@@ -793,8 +959,8 @@ export default function GameScreen() {
                   );
                 })}
               </div>
-              <div className="loadout-seed-preview">
-                {Array.from({ length: SEED_BANK_SIZE }).map((_, index) => {
+              <div className="loadout-seed-preview" style={{ gridTemplateColumns: `repeat(${playerData.seedBankSize}, minmax(3rem, 4.5rem))` }}>
+                {Array.from({ length: playerData.seedBankSize }).map((_, index) => {
                   const plantKey = selectedLoadout[index];
                   return <div key={`preview-${index}`} className={`preview-slot ${plantKey ? "filled" : ""}`}>{plantKey && <img src={plantKey === "peaShooter" ? "/plant_peashooter.webp" : "/sunflower.webp"} alt={PLANT_SPECS[plantKey].name} />}</div>;
                 })}
@@ -817,7 +983,7 @@ export default function GameScreen() {
           <div className="mt-6 space-y-4">
             <div className="game-toolbar">
               <div className="sun-counter" aria-label={`${sun} sun available`}><img src="/sun.webp" alt="" /> <strong>{sun}</strong></div>
-              <div className="seed-tray" aria-label="Seed packet selection">
+              <div className="seed-tray" aria-label="Seed packet selection" style={{ gridTemplateColumns: `repeat(${playerData.seedBankSize}, minmax(3rem, 4.4rem))` }}>
                 {selectedLoadout.map((plantKey) => {
                   const spec = PLANT_SPECS[plantKey];
                   const ready = plantReadyRef.current[spec.key] <= gameTime;
@@ -832,7 +998,7 @@ export default function GameScreen() {
                     </button>
                   );
                 })}
-                {Array.from({ length: Math.max(0, SEED_BANK_SIZE - selectedLoadout.length) }).map((_, index) => <div key={`empty-${index}`} className="seed-slot empty" aria-hidden="true" />)}
+                {Array.from({ length: Math.max(0, playerData.seedBankSize - selectedLoadout.length) }).map((_, index) => <div key={`empty-${index}`} className="seed-slot empty" aria-hidden="true" />)}
               </div>
               <button type="button" aria-label="Select shovel" onClick={() => setShovelSelected((selected) => !selected)} className={`shovel-button ${shovelSelected ? "selected" : ""}`}>⌁<span>Shovel</span></button>
               <button type="button" aria-label="Open pause menu" onClick={() => setIsPaused(true)} className="settings-button">⚙</button>
@@ -900,6 +1066,23 @@ export default function GameScreen() {
                         height: `${24 + sunDrop.value * 0.36}px`,
                       }}
                     />
+                  </button>
+                ))}
+
+                {coins.map((coin) => (
+                  <button
+                    key={coin.id}
+                    type="button"
+                    aria-label={`Collect $${coin.value}`}
+                    onMouseEnter={() => collectCoin(coin.id)}
+                    onFocus={() => collectCoin(coin.id)}
+                    className="absolute z-20 -translate-x-1/2 -translate-y-1/2 transition hover:scale-110"
+                    style={{
+                      left: `${(coin.x / gridCols) * 100}%`,
+                      top: `${(coin.y / gridRows) * 100}%`,
+                    }}
+                  >
+                    <img src={coin.image} alt="" className="h-9 w-9 object-contain drop-shadow-lg" />
                   </button>
                 ))}
 
@@ -996,6 +1179,7 @@ export default function GameScreen() {
           <div className="w-full max-w-xl rounded-3xl border border-lime-400 bg-slate-900/95 p-8 text-center shadow-2xl">
             <h2 className="text-3xl font-semibold text-white">Level Complete!</h2>
             <p className="mt-4 text-slate-300">All zombies have been defeated. Great job on your first level.</p>
+            <p className="mt-3 text-xl font-semibold text-amber-200">{rewardMessage}</p>
             <button
               type="button"
               onClick={returnToMenu}
