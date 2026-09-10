@@ -1,6 +1,11 @@
-export type PlantTypeKey = "sunflower" | "peaShooter";
+export type PlantTypeKey = "sunflower" | "peaShooter" | "wallNut" | "chomper" | "cherryBomb";
 export type GamePhase = "menu" | "level-select" | "shop" | "loadout" | "almanac" | "playing" | "complete";
 import type { TileType } from "./tiles";
+
+export interface LevelReward {
+  money?: number;
+  unlockPlants?: PlantTypeKey[];
+}
 
 export interface LevelConfig {
   id: number;
@@ -15,6 +20,7 @@ export interface LevelConfig {
   betweenWaveDelayMs: number;
   waveSpawnIntervalMs: number;
   skySunIntervalMs?: number;
+  reward?: LevelReward;
   tiles: TileType[][];
 }
 
@@ -42,6 +48,8 @@ export interface PlantInstance {
   nextSunAt?: number;
   nextShotAt?: number;
   lastContactAt?: number;
+  sleepingUntil?: number;
+  cherryBombExplodesAt?: number;
   sunIntervalMs?: number; // randomized sun generation interval
   shootIntervalMs?: number; // randomized attack interval
 }

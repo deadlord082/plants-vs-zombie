@@ -21,6 +21,9 @@ import {
   SUNFLOWER_ARC_DURATION_MS,
   SUNFLOWER_ARC_HEIGHT_TILES,
   ZOMBIE_SPECS,
+  CHERRY_BOMB_FUSE_MS,
+  CHOMPER_BITE_MS,
+  CHOMPER_SLEEP_MS,
 } from "./constants";
 import { getCompiledLevel } from "./levels";
 import type {
@@ -39,6 +42,14 @@ import { getTileDefinition, TILE_DEFINITIONS } from "./tiles";
 const createId = () => Math.random().toString(36).slice(2, 9);
 
 const tileKey = (row: number, col: number) => `${row}-${col}`;
+
+const getPlantImage = (plantType: PlantTypeKey) => ({
+  peaShooter: "/plant_peashooter.webp",
+  sunflower: "/sunflower.webp",
+  wallNut: "/wall-nut.webp",
+  chomper: "/chomper.webp",
+  cherryBomb: "/cherry-bomb.webp",
+}[plantType]);
 
 const getGridRows = (level: LevelConfig | null) => level?.tiles.length || 0;
 const getGridCols = (level: LevelConfig | null) => level?.tiles[0]?.length || 0;
@@ -86,10 +97,14 @@ export default function GameScreen() {
   const [regularSpawned, setRegularSpawned] = useState(0);
   const [wave1Spawned, setWave1Spawned] = useState(0);
   const [wave2Spawned, setWave2Spawned] = useState(0);
+  const [spawnedZombieCount, setSpawnedZombieCount] = useState(0);
   const [waveActive, setWaveActive] = useState(false);
   const [plantReady, setPlantReady] = useState<Record<PlantTypeKey, number>>({
     sunflower: 0,
     peaShooter: 0,
+    wallNut: 0,
+    chomper: 0,
+    cherryBomb: 0,
   });
   const [gameTime, setGameTime] = useState(Date.now());
   const [levelComplete, setLevelComplete] = useState(false);
@@ -108,10 +123,14 @@ export default function GameScreen() {
   const regularSpawnedRef = useRef(0);
   const wave1SpawnedRef = useRef(0);
   const wave2SpawnedRef = useRef(0);
+  const spawnedZombieCountRef = useRef(0);
   const waveActiveRef = useRef(false);
   const plantReadyRef = useRef<Record<PlantTypeKey, number>>({
     sunflower: 0,
     peaShooter: 0,
+    wallNut: 0,
+    chomper: 0,
+    cherryBomb: 0,
   });
   const currentLevelRef = useRef<LevelConfig | null>(null);
   const compiledLevelRef = useRef<ReturnType<typeof getCompiledLevel> | null>(null);
@@ -128,6 +147,7 @@ export default function GameScreen() {
   const playerDataRef = useRef<PlayerData>(DEFAULT_PLAYER_DATA);
   const completionHandledRef = useRef(false);
   const defeatedZombieIdsRef = useRef(new Set<string>());
+  const regularBatchHealthRef = useRef<{ zombieIds: Set<string>; initialHealth: number } | null>(null);
 
   useEffect(() => {
     try {
@@ -140,7 +160,8 @@ export default function GameScreen() {
           ? parsed.seedSlotsPurchased
           : storedSeedBankSize - INITIAL_SEED_BANK_SIZE;
         const unlockedPlants = Array.isArray(parsed.unlockedPlants)
-          ? parsed.unlockedPlants.filter((key): key is PlantTypeKey => key === "peaShooter" || key === "sunflower")
+          ? parsed.unlockedPlants.filter((key): key is PlantTypeKey =>
+            key === "peaShooter" || key === "sunflower" || key === "wallNut" || key === "chomper" || key === "cherryBomb")
           : DEFAULT_PLAYER_DATA.unlockedPlants;
         const loadedData: PlayerData = {
           money: Number.isInteger(storedMoney) && storedMoney >= 0 ? storedMoney : 0,
@@ -214,9 +235,11 @@ export default function GameScreen() {
     wave1SpawnedRef.current = 0;
     setWave2Spawned(0);
     wave2SpawnedRef.current = 0;
+    setSpawnedZombieCount(0);
+    spawnedZombieCountRef.current = 0;
     setWaveActive(false);
     waveActiveRef.current = false;
-    setPlantReadyState({ sunflower: 0, peaShooter: 0 });
+    setPlantReadyState({ sunflower: 0, peaShooter: 0, wallNut: 0, chomper: 0, cherryBomb: 0 });
     setShovelSelected(false);
     setIsPaused(false);
     setLevelComplete(false);
@@ -225,6 +248,7 @@ export default function GameScreen() {
     gameOverRef.current = false;
     completionHandledRef.current = false;
     defeatedZombieIdsRef.current.clear();
+    regularBatchHealthRef.current = null;
   };
 
   const startLevel = (levelId: number) => {
@@ -289,18 +313,22 @@ export default function GameScreen() {
     const levelId = currentLevelRef.current.id;
     const alreadyCompleted = playerDataRef.current.completedLevels.includes(levelId);
     if (!alreadyCompleted) {
-      const reward = levelId === 0 ? 0 : levelId * 100;
+      const reward = currentLevelRef.current.reward;
+      const moneyReward = reward?.money || 0;
+      const unlockedPlants = reward?.unlockPlants || [];
       const nextData: PlayerData = {
         ...playerDataRef.current,
-        money: playerDataRef.current.money + reward,
-        unlockedPlants: levelId === 0
-          ? Array.from(new Set([...playerDataRef.current.unlockedPlants, "sunflower"]))
-          : playerDataRef.current.unlockedPlants,
+        money: playerDataRef.current.money + moneyReward,
+        unlockedPlants: Array.from(new Set([...playerDataRef.current.unlockedPlants, ...unlockedPlants])),
         completedLevels: [...playerDataRef.current.completedLevels, levelId],
       };
       playerDataRef.current = nextData;
       setPlayerData(nextData);
-      setRewardMessage(levelId === 0 ? "Sunflower unlocked!" : `Reward: $${reward}`);
+      const rewardMessages = [
+        moneyReward > 0 ? `Reward: $${moneyReward}` : "",
+        ...unlockedPlants.map((plantKey) => `${PLANT_SPECS[plantKey].name} unlocked!`),
+      ].filter(Boolean);
+      setRewardMessage(rewardMessages.join(" ") || "Level completed!");
     } else {
       setRewardMessage("This level has already been completed.");
     }
@@ -350,6 +378,7 @@ export default function GameScreen() {
       nextSunAt: selectedPlant === "sunflower" ? now + SUNFLOWER_FIRST_BURST_MS : undefined,
       nextShotAt: selectedPlant === "peaShooter" ? now + PEASHOOTER_SHOOT_MS : undefined,
       lastContactAt: now,
+      cherryBombExplodesAt: selectedPlant === "cherryBomb" ? now + CHERRY_BOMB_FUSE_MS : undefined,
       sunIntervalMs: selectedPlant === "sunflower" ? randomizeInterval(spec.generateMs || SUNFLOWER_GENERATION_MS) : undefined,
       shootIntervalMs: selectedPlant === "peaShooter" ? randomizeInterval(spec.shootMs || PEASHOOTER_SHOOT_MS) : undefined,
     };
@@ -498,9 +527,6 @@ export default function GameScreen() {
     let nextCoins = coinsRef.current.filter((coin) => coin.expiresAt > now);
 
     const spawnState = spawnScheduleRef.current;
-    const totalRegular = currentLevel.preWaveCount + currentLevel.midCount;
-    const firstWaveTotal = currentLevel.wave1Count;
-    const secondWaveTotal = currentLevel.wave2Count;
     const regularInterval = currentLevel.regularSpawnIntervalMs;
     const waveInterval = currentLevel.waveSpawnIntervalMs;
     const betweenDelay = currentLevel.betweenWaveDelayMs;
@@ -536,71 +562,74 @@ export default function GameScreen() {
       nextSkySunAtRef.current += currentLevel.skySunIntervalMs;
     }
 
-    if (!waveActiveRef.current && regularSpawnedRef.current < totalRegular && now >= spawnState.nextRegularSpawn) {
-      // Spawn batch of zombies using compiled level's wave spawn batches
-      if (compiledLevelRef.current && spawnState.batchIndex < compiledLevelRef.current.waveSpawns.length) {
-        const batch = compiledLevelRef.current.waveSpawns[spawnState.batchIndex];
-        // Spawn every zombie at a random row from the active level.
-        for (const zombieSpawn of batch) {
-          const newZ = spawnZombie(false, zombieSpawn.type);
-          nextZombies.push(newZ);
-          regularSpawnedRef.current += 1;
-        }
-        setRegularSpawned(regularSpawnedRef.current);
-        spawnState.batchIndex += 1;
-      }
-      spawnState.nextRegularSpawn = now + regularInterval;
+    const compiledLevel = compiledLevelRef.current;
+    const nextWave = compiledLevel?.spawnWaves[spawnState.batchIndex];
+    const regularBatchHealth = regularBatchHealthRef.current;
+    const regularBatchBelowHalf = regularBatchHealth
+      ? nextZombies
+        .filter((zombie) => regularBatchHealth.zombieIds.has(zombie.id))
+        .reduce((total, zombie) => total + zombie.hp, 0) <= regularBatchHealth.initialHealth * 0.5
+      : false;
 
-      if (regularSpawnedRef.current === currentLevel.preWaveCount && firstWaveTotal > 0) {
-        spawnState.nextWaveStart = now + betweenDelay;
-        spawnState.nextWaveNumber = 1;
-      } else if (regularSpawnedRef.current === totalRegular && secondWaveTotal > 0 && wave1SpawnedRef.current >= firstWaveTotal) {
-        spawnState.nextWaveStart = now + betweenDelay;
-        spawnState.nextWaveNumber = 2;
-      }
-    }
-
-    if (!waveActiveRef.current && spawnState.nextWaveStart > 0 && now >= spawnState.nextWaveStart) {
+    const canStartRegularWave = nextWave && !nextWave.isBoss && (now >= spawnState.nextRegularSpawn || regularBatchBelowHalf);
+    const canStartBossWave = nextWave?.isBoss && spawnState.nextWaveStart > 0 && now >= spawnState.nextWaveStart;
+    if (!waveActiveRef.current && (canStartRegularWave || canStartBossWave)) {
       waveActiveRef.current = true;
       setWaveActive(true);
       spawnState.nextWaveSpawn = now;
+      spawnState.nextWaveNumber = 0;
+      if (!nextWave.isBoss) {
+        regularBatchHealthRef.current = { zombieIds: new Set<string>(), initialHealth: 0 };
+      }
     }
 
-    if (waveActiveRef.current && spawnState.nextWaveSpawn > 0) {
-      const waveNumber = spawnState.nextWaveNumber;
-      const waveTotal = waveNumber === 1 ? firstWaveTotal : secondWaveTotal;
-      const waveSpawnedRef = waveNumber === 1 ? wave1SpawnedRef : wave2SpawnedRef;
-      const setWaveSpawned = waveNumber === 1 ? setWave1Spawned : setWave2Spawned;
-
-      if (waveSpawnedRef.current < waveTotal && now >= spawnState.nextWaveSpawn) {
-        // Spawn zombie using compiled level's boss wave sequence for correct type
-        let zombieType = "basic";
-        const waveIdx = spawnState.nextWaveNumber - 1; // 1-indexed to 0-indexed
-        if (
-          compiledLevelRef.current &&
-          waveIdx < compiledLevelRef.current.bossWaveSequences.length &&
-          waveSpawnedRef.current < compiledLevelRef.current.bossWaveSequences[waveIdx].length
-        ) {
-          zombieType = compiledLevelRef.current.bossWaveSequences[waveIdx][waveSpawnedRef.current].type;
-        }
-        const newZ = spawnZombie(true, zombieType);
-        nextZombies.push(newZ);
-        waveSpawnedRef.current += 1;
-        setWaveSpawned(waveSpawnedRef.current);
-        spawnState.nextWaveSpawn = now + waveInterval;
-
-        if (waveSpawnedRef.current === waveTotal) {
-          waveActiveRef.current = false;
-          setWaveActive(false);
-          spawnState.nextWaveSpawn = 0;
-          spawnState.nextWaveStart = 0;
-
-          if (waveNumber === 1 && secondWaveTotal > 0) {
+    if (waveActiveRef.current && nextWave && now >= spawnState.nextWaveSpawn) {
+      const zombieSpawn = nextWave.zombies[spawnState.nextWaveNumber];
+      const newZ = spawnZombie(nextWave.isBoss, zombieSpawn?.type || "basic");
+      nextZombies.push(newZ);
+      if (!nextWave.isBoss && regularBatchHealthRef.current) {
+        regularBatchHealthRef.current.zombieIds.add(newZ.id);
+        regularBatchHealthRef.current.initialHealth += newZ.hp;
+        regularSpawnedRef.current += 1;
+        setRegularSpawned(regularSpawnedRef.current);
+      }
+      spawnState.nextWaveNumber += 1;
+      spawnedZombieCountRef.current += 1;
+      setSpawnedZombieCount(spawnedZombieCountRef.current);
+      if (spawnState.nextWaveNumber >= nextWave.zombies.length) {
+        waveActiveRef.current = false;
+        setWaveActive(false);
+        spawnState.batchIndex += 1;
+        spawnState.nextWaveSpawn = 0;
+        spawnState.nextWaveStart = 0;
+        if (compiledLevel?.spawnWaves[spawnState.batchIndex]) {
+          const followingWave = compiledLevel.spawnWaves[spawnState.batchIndex];
+          if (followingWave.isBoss) {
             spawnState.nextWaveStart = now + betweenDelay;
-            spawnState.nextWaveNumber = 2;
+          } else {
+            spawnState.nextRegularSpawn = now + (nextWave.isBoss ? betweenDelay : regularInterval);
           }
         }
+        if (nextWave.isBoss) {
+          regularBatchHealthRef.current = null;
+        }
+      } else {
+        spawnState.nextWaveSpawn = now + waveInterval;
       }
+    }
+
+    const explodingCherryBombs = nextPlants.filter(
+      (plant) => plant.type === "cherryBomb" && plant.cherryBombExplodesAt && now >= plant.cherryBombExplodesAt,
+    );
+    for (const cherryBomb of explodingCherryBombs) {
+      nextZombies = nextZombies.map((zombie) => {
+        const inBlast = Math.abs(zombie.row - cherryBomb.row) <= 1 && Math.abs(Math.floor(zombie.x) - cherryBomb.col) <= 1;
+        return inBlast ? { ...zombie, hp: Math.max(0, zombie.hp - 1000) } : zombie;
+      });
+    }
+    if (explodingCherryBombs.length > 0) {
+      const explodedIds = new Set(explodingCherryBombs.map((plant) => plant.id));
+      nextPlants = nextPlants.filter((plant) => !explodedIds.has(plant.id));
     }
 
     nextPlants = nextPlants.map((plant) => {
@@ -663,6 +692,31 @@ export default function GameScreen() {
         };
       }
 
+      if (plant.type === "chomper") {
+        if (plant.sleepingUntil && now < plant.sleepingUntil) return plant;
+
+        const target = nextZombies
+          .filter((zombie) => zombie.hp > 0 && zombie.row === plant.row && zombie.x > plant.col && zombie.x <= plant.col + 1)
+          .sort((a, b) => a.x - b.x)[0];
+        if (!target) return plant;
+
+        const targetMaxHp = ZOMBIE_SPECS[target.type]?.hp || target.hp;
+        if (targetMaxHp <= 200) {
+          nextZombies = nextZombies.map((zombie) => zombie.id === target.id ? { ...zombie, hp: 0 } : zombie);
+          return { ...plant, sleepingUntil: now + CHOMPER_SLEEP_MS, lastContactAt: now };
+        }
+
+        if (now - (plant.lastContactAt || 0) >= CHOMPER_BITE_MS) {
+          let damageToHp = 40;
+          const newArmor = Math.max(0, target.armor - 40);
+          damageToHp = Math.max(0, 40 - (target.armor - newArmor));
+          nextZombies = nextZombies.map((zombie) => zombie.id === target.id
+            ? { ...zombie, armor: newArmor, hp: Math.max(0, zombie.hp - damageToHp) }
+            : zombie);
+          return { ...plant, lastContactAt: now };
+        }
+      }
+
       return plant;
     });
 
@@ -703,11 +757,13 @@ export default function GameScreen() {
     const walkPeriodMs = 3000; // 1.5 second walking cycle
     nextZombies = nextZombies.map((zombie) => {
       const plantIndex = nextPlants.findIndex((plant) => plant.row === zombie.row && Math.floor(zombie.x) === plant.col);
-      if (plantIndex >= 0) {
+      if (plantIndex >= 0 && zombie.hp > 0) {
         // stop moving and attack the plant periodically
         if (now - zombie.lastAttackAt >= ZOMBIE_ATTACK_MS) {
           const plant = nextPlants[plantIndex];
-          nextPlants[plantIndex] = { ...plant, hp: Math.max(0, plant.hp - (ZOMBIE_SPECS[zombie.type]?.damage || 50)) };
+          nextPlants[plantIndex] = plant.type === "cherryBomb"
+            ? plant
+            : { ...plant, hp: Math.max(0, plant.hp - (ZOMBIE_SPECS[zombie.type]?.damage || 50)) };
           zombie = { ...zombie, lastAttackAt: now };
         }
 
@@ -715,7 +771,7 @@ export default function GameScreen() {
         const plant = nextPlants[plantIndex];
         const spec = PLANT_SPECS[plant.type];
         const contactInterval = spec.shootMs || PEASHOOTER_SHOOT_MS;
-        if (spec.damage && now - (plant.lastContactAt || 0) >= contactInterval) {
+        if (plant.type !== "chomper" && spec.damage && now - (plant.lastContactAt || 0) >= contactInterval) {
           let damageToHP = spec.damage;
           let newArmor = zombie.armor;
           // Armor absorbs damage first
@@ -786,9 +842,8 @@ export default function GameScreen() {
     setCoinsState(nextCoins);
 
     if (
-      regularSpawnedRef.current === totalRegular &&
-      wave1SpawnedRef.current === firstWaveTotal &&
-      wave2SpawnedRef.current === secondWaveTotal &&
+      compiledLevelRef.current &&
+      spawnedZombieCountRef.current === compiledLevelRef.current.totalZombieCount &&
       nextZombies.length === 0 &&
       !waveActiveRef.current
     ) {
@@ -805,14 +860,18 @@ export default function GameScreen() {
   );
   const gridRows = getGridRows(currentLevel);
   const gridCols = getGridCols(currentLevel);
+  const compiledCurrentLevel = currentLevel ? getCompiledLevel(currentLevel.id) : null;
 
   const progressMax = currentLevel
-    ? currentLevel.preWaveCount + currentLevel.midCount + currentLevel.wave1Count + currentLevel.wave2Count
+    ? compiledCurrentLevel?.totalZombieCount || 1
     : 1;
-  const zombiesSent = regularSpawned + wave1Spawned + wave2Spawned;
+  const zombiesSent = spawnedZombieCount;
   const progressPercent = currentLevel ? Math.round((zombiesSent / progressMax) * 100) : 0;
-  const waveThresholds = currentLevel
-    ? [currentLevel.preWaveCount].concat(currentLevel.midCount > 0 ? [currentLevel.preWaveCount + currentLevel.midCount] : [])
+  const waveThresholds = compiledCurrentLevel
+    ? compiledCurrentLevel.spawnWaves.reduce<number[]>((thresholds, wave, index) => {
+      if (wave.isBoss && index > 0) thresholds.push(compiledCurrentLevel.spawnWaves.slice(0, index).reduce((total, previous) => total + previous.zombies.length, 0));
+      return thresholds;
+    }, [])
     : [];
   const title =
     phase === "menu"
@@ -828,24 +887,11 @@ export default function GameScreen() {
               : "Level";
   const waveStageLabel = (() => {
     if (!currentLevel) return "";
-    if (regularSpawnedRef.current < currentLevel.preWaveCount) {
-      return "Regular zombies are marching.";
-    }
-    if (waveActive && spawnScheduleRef.current.nextWaveNumber === 1) {
-      return "First wave in progress.";
-    }
-    if (regularSpawnedRef.current < currentLevel.preWaveCount + currentLevel.midCount) {
-      return "Extra zombies are coming before the final wave.";
-    }
-    if (currentLevel.wave2Count > 0 && !waveActive && wave1SpawnedRef.current === currentLevel.wave1Count) {
-      return "Preparing the final wave...";
-    }
-    if (waveActive && spawnScheduleRef.current.nextWaveNumber === 2) {
-      return "Second wave in progress.";
-    }
-    return "";
+    const nextWave = compiledCurrentLevel?.spawnWaves[spawnScheduleRef.current.batchIndex];
+    if (waveActive && nextWave?.isBoss) return "Boss wave in progress.";
+    if (nextWave?.isBoss) return "Preparing a boss wave...";
+    return nextWave ? "Regular zombies are marching." : "";
   })();
-  const compiledCurrentLevel = currentLevel ? getCompiledLevel(currentLevel.id) : null;
   const zombieTypes = compiledCurrentLevel
     ? Array.from(
       new Set([
@@ -928,7 +974,7 @@ export default function GameScreen() {
               {(["plants", "zombies", "tiles"] as AlmanacCategory[]).map((category) => <button key={category} type="button" role="tab" aria-selected={almanacCategory === category} onClick={() => setAlmanacCategory(category)} className={almanacCategory === category ? "active" : ""}>{category}</button>)}
             </div>
             <div className="almanac-grid">
-              {almanacCategory === "plants" && Object.values(PLANT_SPECS).map((spec) => <article key={spec.key} className="almanac-card"><div className="almanac-art plant-art"><img src={spec.key === "peaShooter" ? "/plant_peashooter.webp" : "/sunflower.webp"} alt="" /></div><div><p className="almanac-type">Plant</p><h3>{spec.name}</h3><p>{spec.summary}</p><dl><div><dt>Cost</dt><dd>{spec.cost} sun</dd></div><div><dt>Health</dt><dd>{spec.hp} HP</dd></div><div><dt>Recharge</dt><dd>{spec.rechargeMs / 1000}s</dd></div>{spec.damage && <div><dt>Damage</dt><dd>{spec.damage}</dd></div>}</dl></div></article>)}
+              {almanacCategory === "plants" && Object.values(PLANT_SPECS).map((spec) => <article key={spec.key} className="almanac-card"><div className="almanac-art plant-art"><img src={getPlantImage(spec.key)} alt="" /></div><div><p className="almanac-type">Plant</p><h3>{spec.name}</h3><p>{spec.summary}</p><dl><div><dt>Cost</dt><dd>{spec.cost} sun</dd></div><div><dt>Health</dt><dd>{spec.hp} HP</dd></div><div><dt>Recharge</dt><dd>{spec.rechargeMs / 1000}s</dd></div>{spec.damage && <div><dt>Damage</dt><dd>{spec.damage}</dd></div>}</dl></div></article>)}
               {almanacCategory === "zombies" && Object.values(ZOMBIE_SPECS).map((spec) => <article key={spec.key} className="almanac-card"><div className="almanac-art zombie-art">{spec.key === "basic" ? <img src="/zombie.webp" alt="" /> : <span className={`zombie-placeholder ${spec.key}`}>{spec.key === "imp" ? "IMP" : "CONE"}</span>}</div><div><p className="almanac-type">Zombie</p><h3>{spec.name}</h3><p>{spec.summary}</p><dl><div><dt>Health</dt><dd>{spec.hp} HP</dd></div><div><dt>Speed</dt><dd>{Math.round(spec.moveMs / 100) / 10}s / tile</dd></div><div><dt>Damage</dt><dd>{spec.damage}</dd></div><div><dt>Armor</dt><dd>{spec.armor}</dd></div></dl></div></article>)}
               {almanacCategory === "tiles" && Object.values(TILE_DEFINITIONS).map((tile) => <article key={tile.key} className="almanac-card tile-card"><div className={`almanac-tile-swatch ${tile.key}`} /><div><p className="almanac-type">Tile</p><h3>{tile.key === "normalDark" ? "Dark lawn" : tile.key === "normal" ? "Lawn" : "Obstructed"}</h3><p>{tile.description}</p><dl><div><dt>Plantable</dt><dd>{tile.canPlant ? "Yes" : "No"}</dd></div><div><dt>Label</dt><dd>{tile.label || "None"}</dd></div></dl></div></article>)}
             </div>
@@ -952,7 +998,7 @@ export default function GameScreen() {
                   const selected = selectedLoadout.includes(plantKey);
                   return (
                     <button key={plantKey} type="button" onClick={() => toggleLoadoutPlant(plantKey)} className={`plant-choice ${selected ? "selected" : ""}`} aria-pressed={selected}>
-                      <div className="plant-choice-image"><img src={plantKey === "peaShooter" ? "/plant_peashooter.webp" : "/sunflower.webp"} alt="" /></div>
+                      <div className="plant-choice-image"><img src={getPlantImage(plantKey)} alt="" /></div>
                       <div><h3>{spec.name}</h3><p>{spec.cost} sun</p></div>
                       <span className="plant-choice-check">{selected ? "✓" : "+"}</span>
                     </button>
@@ -962,7 +1008,7 @@ export default function GameScreen() {
               <div className="loadout-seed-preview" style={{ gridTemplateColumns: `repeat(${playerData.seedBankSize}, minmax(3rem, 4.5rem))` }}>
                 {Array.from({ length: playerData.seedBankSize }).map((_, index) => {
                   const plantKey = selectedLoadout[index];
-                  return <div key={`preview-${index}`} className={`preview-slot ${plantKey ? "filled" : ""}`}>{plantKey && <img src={plantKey === "peaShooter" ? "/plant_peashooter.webp" : "/sunflower.webp"} alt={PLANT_SPECS[plantKey].name} />}</div>;
+                  return <div key={`preview-${index}`} className={`preview-slot ${plantKey ? "filled" : ""}`}>{plantKey && <img src={getPlantImage(plantKey)} alt={PLANT_SPECS[plantKey].name} />}</div>;
                 })}
               </div>
             </section>
@@ -992,7 +1038,7 @@ export default function GameScreen() {
                   const coolDown = Math.max(0, Math.ceil((plantReadyRef.current[spec.key] - gameTime) / 1000));
                   return (
                     <button key={spec.key} type="button" aria-label={`${spec.name}, costs ${spec.cost} sun`} onClick={() => { setSelectedPlant(spec.key); setShovelSelected(false); }} className={`seed-slot ${selectedPlant === spec.key && !shovelSelected ? "selected" : ""} ${disabled ? "unavailable" : ""}`}>
-                      <img src={spec.key === "peaShooter" ? "/plant_peashooter.webp" : "/sunflower.webp"} alt="" />
+                      <img src={getPlantImage(spec.key)} alt="" />
                       <span>{spec.cost}</span>
                       {!ready && <small>{coolDown}s</small>}
                     </button>
@@ -1022,16 +1068,34 @@ export default function GameScreen() {
                       {tile.label && !plant && <span className="text-xs font-semibold uppercase tracking-wide text-stone-200">{tile.label}</span>}
                       {plant && (
                         <div className="relative h-full w-full text-xs text-lime-200">
-                          <img
-                            src={plant.type === "peaShooter" ? "/plant_peashooter.webp" : "/sunflower.webp"}
-                            alt={PLANT_SPECS[plant.type].name}
-                            className="absolute inset-0 h-full w-full scale-125 object-contain"
-                            onError={(event) => {
-                              event.currentTarget.remove();
-                              event.currentTarget.nextElementSibling?.classList.remove("hidden");
-                              event.currentTarget.parentElement?.querySelector("[data-image-debug-health]")?.classList.add("hidden");
-                            }}
-                          />
+                          {(() => {
+                            const wallNutImage = plant.type === "wallNut"
+                              ? plant.hp <= 1000 ? "/wall-nut-heavely-damaged.webp" : plant.hp <= 2500 ? "/wall-nut-damaged.webp" : "/wall-nut.webp"
+                              : getPlantImage(plant.type);
+                            const isSleeping = plant.type === "chomper" && plant.sleepingUntil && plant.sleepingUntil > gameTime;
+                            const cherryGrowth = plant.type === "cherryBomb" && plant.cherryBombExplodesAt
+                              ? Math.min(1, Math.max(0, 1 - (plant.cherryBombExplodesAt - gameTime) / CHERRY_BOMB_FUSE_MS))
+                              : 0;
+                            return (
+                              <img
+                                src={wallNutImage}
+                                alt={PLANT_SPECS[plant.type].name}
+                                className="absolute inset-0 h-full w-full scale-125 object-contain"
+                                style={{
+                                  transform: plant.type === "cherryBomb"
+                                    ? `scale(${0.75 + cherryGrowth * 0.35})`
+                                    : isSleeping ? "scale(1.05, 0.72)" : "scale(1.25)",
+                                  filter: isSleeping ? "brightness(0.58)" : undefined,
+                                  transition: `transform ${GAME_TICK_MS}ms ease-out, filter ${GAME_TICK_MS}ms ease-out`,
+                                }}
+                                onError={(event) => {
+                                  event.currentTarget.remove();
+                                  event.currentTarget.nextElementSibling?.classList.remove("hidden");
+                                  event.currentTarget.parentElement?.querySelector("[data-image-debug-health]")?.classList.add("hidden");
+                                }}
+                              />
+                            );
+                          })()}
                           <div className="relative z-10 hidden h-full w-full flex-col justify-between border border-lime-500/20 bg-lime-500/10 p-2">
                             <span>{PLANT_SPECS[plant.type].name}</span>
                             {showDebugHealth && <span className="text-[11px] text-slate-200">HP: {plant.hp}</span>}

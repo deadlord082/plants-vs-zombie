@@ -15,6 +15,9 @@ export const SKY_SUN_FALL_SPEED_TILES_PER_MS = SUN_FALL_SPEED_TILES_PER_MS / 4;
 export const SUNFLOWER_ARC_DURATION_MS = 1400;
 export const SUNFLOWER_ARC_HEIGHT_TILES = 0.275;
 export const PEASHOOTER_SHOOT_MS = 1500;
+export const CHOMPER_BITE_MS = 1500;
+export const CHOMPER_SLEEP_MS = 10000;
+export const CHERRY_BOMB_FUSE_MS = 2000;
 export const PROJECTILE_SPEED_PER_TICK = 0.8;
 export const GAME_TICK_MS = 200;
 
@@ -39,6 +42,33 @@ export const PLANT_SPECS: Record<PlantTypeKey, PlantSpec> = {
     summary: "Shoots every 1.5s and deals 20 damage to the first zombie.",
     damage: 20,
     shootMs: PEASHOOTER_SHOOT_MS,
+  },
+  wallNut: {
+    key: "wallNut",
+    name: "Wall-nut",
+    hp: 4000,
+    cost: 50,
+    rechargeMs: 15000,
+    summary: "A sturdy defensive plant with 4,000 HP that changes appearance as it takes damage.",
+  },
+  chomper: {
+    key: "chomper",
+    name: "Chomper",
+    hp: 300,
+    cost: 100,
+    rechargeMs: 10000,
+    summary: "Eats zombies with 200 HP or less, or bites tougher zombies in the next tile for 40 damage.",
+    damage: 40,
+    shootMs: PEASHOOTER_SHOOT_MS,
+  },
+  cherryBomb: {
+    key: "cherryBomb",
+    name: "Cherry Bomb",
+    hp: 1,
+    cost: 150,
+    rechargeMs: 20000,
+    summary: "Explodes after 3 seconds, dealing 1,000 damage to every zombie in a 3x3 area.",
+    damage: 1000,
   },
 };
 

@@ -3,10 +3,16 @@
  */
 
 import type { TileType } from "../tiles";
+import type { LevelReward } from "../types";
 
 export interface ZombieSpawn {
   type: "basic" | "imp" | "cone";
   count: number;
+}
+
+export interface WaveDefinition {
+  zombies: ZombieSpawn[];
+  bossWaves?: boolean;
 }
 
 export interface LevelDefinition {
@@ -18,11 +24,10 @@ export interface LevelDefinition {
   betweenWaveDelayMs: number;
   waveSpawnIntervalMs: number;
   skySunIntervalMs?: number;
+  reward?: LevelReward;
   tiles: TileType[][];
-  // Waves of pre-boss spawns (each sub-array spawns together, separate arrays are separated by regularSpawnIntervalMs)
-  waves: ZombieSpawn[][];
-  // Boss waves (harder waves that spawn after main waves)
-  bossWaves: ZombieSpawn[][];
+  // Each wave spawns together unless it is marked as a boss wave.
+  waves: WaveDefinition[];
 }
 
 /**
@@ -37,6 +42,7 @@ export interface CompiledLevelConfig {
   betweenWaveDelayMs: number;
   waveSpawnIntervalMs: number;
   skySunIntervalMs?: number;
+  reward?: LevelReward;
   tiles: TileType[][];
   // Total pre-wave zombies
   preWaveCount: number;
@@ -44,8 +50,13 @@ export interface CompiledLevelConfig {
   wave1Count: number;
   midCount: number;
   wave2Count: number;
-  // Spawn batches for pre-waves (each batch spawns together)
+  // Compiled regular wave batches, retained for progress and Almanac data.
   waveSpawns: Array<Array<{ type: "basic" | "imp" | "cone"; index: number }>>;
   // Boss wave sequences
   bossWaveSequences: Array<Array<{ type: "basic" | "imp" | "cone"; index: number }>>;
+  spawnWaves: Array<{
+    zombies: Array<{ type: "basic" | "imp" | "cone"; index: number }>;
+    isBoss: boolean;
+  }>;
+  totalZombieCount: number;
 }

@@ -15,33 +15,41 @@ export function compileLevelDefinition(def: LevelDefinition): CompiledLevelConfi
   validateTileMap(def.tiles, def.id);
 
   // Calculate total pre-wave zombies
-  const preWaveCount = def.waves.reduce((sum, batch) => sum + batch.reduce((batchSum, spawn) => batchSum + spawn.count, 0), 0);
+  const regularWaves = def.waves.filter((wave) => !wave.bossWaves);
+  const bossWaves = def.waves.filter((wave) => wave.bossWaves);
+  const spawnWaves: CompiledLevelConfig["spawnWaves"] = [];
+  const preWaveCount = regularWaves.reduce((sum, wave) => sum + wave.zombies.reduce((batchSum, spawn) => batchSum + spawn.count, 0), 0);
 
-  // Build wave spawn batches (each batch spawns together at same time)
+  // Build wave spawn batches; the scheduler releases each zombie at the wave interval.
   const waveSpawns: Array<Array<{ type: "basic" | "imp" | "cone"; index: number }>> = [];
   let zombieIndex = 0;
-  for (const batch of def.waves) {
+  for (const wave of def.waves) {
     const batchZombies: Array<{ type: "basic" | "imp" | "cone"; index: number }> = [];
-    for (const spawn of batch) {
+    for (const spawn of wave.zombies) {
       for (let i = 0; i < spawn.count; i++) {
         batchZombies.push({ type: spawn.type, index: zombieIndex });
         zombieIndex++;
       }
     }
-    waveSpawns.push(batchZombies);
+    if (wave.bossWaves) {
+      spawnWaves.push({ zombies: batchZombies, isBoss: true });
+    } else {
+      waveSpawns.push(batchZombies);
+      spawnWaves.push({ zombies: batchZombies, isBoss: false });
+    }
   }
 
   // Calculate boss wave counts
-  const wave1Count = def.bossWaves[0] ? def.bossWaves[0].reduce((sum, spawn) => sum + spawn.count, 0) : 0;
-  const midCount = def.bossWaves[1] ? def.bossWaves[1].reduce((sum, spawn) => sum + spawn.count, 0) : 0;
-  const wave2Count = def.bossWaves[2] ? def.bossWaves[2].reduce((sum, spawn) => sum + spawn.count, 0) : 0;
+  const wave1Count = bossWaves[0] ? bossWaves[0].zombies.reduce((sum, spawn) => sum + spawn.count, 0) : 0;
+  const midCount = bossWaves[1] ? bossWaves[1].zombies.reduce((sum, spawn) => sum + spawn.count, 0) : 0;
+  const wave2Count = bossWaves[2] ? bossWaves[2].zombies.reduce((sum, spawn) => sum + spawn.count, 0) : 0;
 
   // Build boss wave sequences
   const bossWaveSequences: Array<Array<{ type: "basic" | "imp" | "cone"; index: number }>> = [];
-  for (const bossWave of def.bossWaves) {
+  for (const bossWave of bossWaves) {
     const waveSequence: Array<{ type: "basic" | "imp" | "cone"; index: number }> = [];
     zombieIndex = 0;
-    for (const spawn of bossWave) {
+    for (const spawn of bossWave.zombies) {
       for (let i = 0; i < spawn.count; i++) {
         waveSequence.push({ type: spawn.type, index: zombieIndex });
         zombieIndex++;
@@ -59,6 +67,7 @@ export function compileLevelDefinition(def: LevelDefinition): CompiledLevelConfi
     betweenWaveDelayMs: def.betweenWaveDelayMs,
     waveSpawnIntervalMs: def.waveSpawnIntervalMs,
     skySunIntervalMs: def.skySunIntervalMs,
+    reward: def.reward,
     tiles: def.tiles,
     preWaveCount,
     wave1Count,
@@ -66,6 +75,8 @@ export function compileLevelDefinition(def: LevelDefinition): CompiledLevelConfi
     wave2Count,
     waveSpawns,
     bossWaveSequences,
+    spawnWaves,
+    totalZombieCount: spawnWaves.reduce((total, wave) => total + wave.zombies.length, 0),
   };
 }
 
@@ -87,6 +98,7 @@ export function toLevelConfig(compiled: CompiledLevelConfig): LevelConfig {
     betweenWaveDelayMs: compiled.betweenWaveDelayMs,
     waveSpawnIntervalMs: compiled.waveSpawnIntervalMs,
     skySunIntervalMs: compiled.skySunIntervalMs,
+    reward: compiled.reward,
     tiles: compiled.tiles,
   };
 }

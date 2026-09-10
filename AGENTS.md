@@ -14,17 +14,21 @@ This repository is a Next.js remake of Plants vs. Zombies. The main game screen 
 - The game has menu, level selection, loadout, Almanac, playing, complete, and game-over phases.
 - Starting a level from level selection opens the loadout screen first. Gameplay must not begin until the player selects at least one plant and clicks Start level.
 - The loadout screen shows selectable unlocked plants, a level-specific roster of distinct zombie types, and a configurable seed bank. Keep the bank capacity in player data so future seed-slot upgrades can increase it without changing the UI structure.
-- Players spend sun to plant sunflowers and pea shooters on available lawn tiles.
+- Players spend sun to plant unlocked sunflowers, pea shooters, Wall-nuts, Chompers, and Cherry Bombs on available lawn tiles.
 - Sunflowers generate sun over time. Pea shooters fire projectiles at zombies in the same row.
+- Wall-nuts have 4,000 HP and use progressively damaged sprites as their HP falls.
+- Chompers eat zombies with 200 maximum HP or less, ignoring armor, then sleep for their configured sleep duration. Against tougher zombies they bite targets within one tile for 40 damage with armor-first damage handling.
+- Cherry Bombs are invulnerable while armed, grow during their fuse, then explode for 1,000 damage in a 3x3 tile area.
 - Zombies move from the right toward the house, attack plants when they reach them, and cause game over when they cross the left boundary.
-- Zombie spawning is controlled by each level's regular waves and boss waves. Zombie rows must be selected randomly using the active level's row count.
+- Zombie spawning is controlled by the single ordered `waves` list in each level definition. Each entry has a `zombies` array and may set `bossWaves: true` for progress-bar and visual boss markers. Regular and boss waves use the same staggered per-zombie spawn mechanism; regular batches also use the configured health threshold and timer fallback.
+- Zombie rows must be selected randomly using the active level's row count.
 - Keep gameplay state and simulation updates in `GameScreen.tsx` unless a new abstraction clearly belongs elsewhere.
 
 ### Player Progression and Money
 
 - Persist player progression in browser `localStorage` under the `plants-vs-zombie-player` key. The stored player data contains integer `money`, `unlockedPlants`, completed level IDs, `seedBankSize`, and `seedSlotsPurchased`.
 - A new player starts with zero money, only the `peaShooter` unlocked, no completed levels, and the initial six seed slots.
-- Completing tutorial level ID `0` unlocks `sunflower`. Completing levels 1, 2, and 3 awards `$100`, `$200`, and `$300` respectively.
+- Completion rewards are declared by each level's `reward` field. A reward may contain `money`, `unlockPlants`, or both. Current levels unlock `sunflower` after the tutorial, `wallNut` after level 1, `chomper` after level 2, and `cherryBomb` after level 3.
 - Completion rewards and plant unlocks are granted only the first time a level is completed. Replaying a completed level must not grant its reward again, though the level remains playable.
 - The level selector displays completed levels, and the main menu displays the player's money and seed capacity.
 - The Shop offers exactly two one-time seed-slot purchases: the first costs `$50,000`, and the second costs `$80,000`. Once both are purchased, no further seed-slot purchase is available.
@@ -57,7 +61,10 @@ Each level must define a rectangular `tiles` matrix in its own level file:
 - The number of entries in each row defines the lawn width.
 - Every row must have the same width and the matrix must not be empty.
 - Do not reintroduce global fixed grid dimensions; derive dimensions from the active level.
-- Waves contain regular zombie batches. `bossWaves` contains the later wave sequences.
+- Each level has one ordered `waves` array. Every entry uses `{ zombies: [{ type, count }], bossWaves?: boolean }`; `bossWaves` is a marker for boss progress visuals, not a separate spawn collection.
+- Regular and boss zombies are compiled into one ordered runtime sequence. Zombies within every wave spawn at `waveSpawnIntervalMs`, so multiple zombies do not appear perfectly aligned.
+- Regular waves advance when the previous regular batch's combined HP falls below 50%, with `regularSpawnIntervalMs` retained as the timer fallback. Boss waves use the same per-zombie timing and follow the same ordered sequence.
+- Level rewards belong in the level definition's `reward` field rather than hard-coded level-ID conditions in `GameScreen.tsx`.
 - Set `skySunIntervalMs` only for levels that should have periodic sky suns; omit it for levels without sky drops.
 
 ### Menu and Almanac UI
@@ -81,7 +88,7 @@ Tile types are declared in `app/components/game/tiles.ts`. Each tile definition 
 
 - Pea projectiles render with the transparent asset at `public/projectile-pea.webp`; previous green-dot rendering remains commented in code as an immediate fallback if per-projectile image loading proves unreliable.
 - Sun drops pulse for the last 5 seconds before they disappear, matching the original Plants vs. Zombies urgency effect.
-- Plant sprites are loaded from `public/sunflower.webp` and `public/plant_peashooter.webp` when available. If an image fails to load, the original text-based tile fallback remains visible instead of breaking the UI.
+- Plant sprites are loaded from `public/sunflower.webp`, `public/plant_peashooter.webp`, `public/wall-nut.webp`, `public/wall-nut-damaged.webp`, `public/wall-nut-heavely-damaged.webp`, `public/chomper.webp`, and `public/cherry-bomb.webp` when available. If an image fails to load, the original text-based tile fallback remains visible instead of breaking the UI.
 - Basic zombies render from `public/zombie.webp`. The sprite should be scaled larger than the original placeholder but kept from expanding downward; it should grow upward and sideways while staying grounded at the bottom edge.
 - Plant image tiles should not render the old bordered container when the sprite is present; the image should visually fill the tile area more cleanly.
 - The project uses a debug-only health overlay: press `H` to toggle health text for all plants and zombies, defaulting to hidden.

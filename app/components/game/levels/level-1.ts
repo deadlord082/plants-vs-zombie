@@ -9,6 +9,7 @@ export const LEVEL_1: LevelDefinition = {
   betweenWaveDelayMs: 3000,
   waveSpawnIntervalMs: 1200,
   skySunIntervalMs: 10000,
+  reward: { unlockPlants: ["wallNut"] },
   tiles: [
     ["normal", "normalDark", "normal", "normalDark", "normal", "normalDark", "normal", "normalDark"],
     ["normalDark", "normal", "normalDark", "normal", "normalDark", "normal", "normalDark", "normal"],
@@ -17,24 +18,22 @@ export const LEVEL_1: LevelDefinition = {
     ["normal", "normalDark", "normal", "normalDark", "normal", "normalDark", "normal", "normalDark"],
     ["normalDark", "normal", "normalDark", "normal", "normalDark", "normal", "normalDark", "normal"],
   ],
-  // Waves: each batch spawns together, separated by regularSpawnIntervalMs
+  // Each wave batch spawns together; boss waves use the boss spawn timing.
   waves: [
-    [{ type: "basic", count: 1 }],
-    [{ type: "basic", count: 1 }],
-    [{ type: "basic", count: 1 }],
-    [{ type: "imp", count: 1 }],
-    [{ type: "basic", count: 2 }],
-    [{ type: "cone", count: 1 }],
-    [{ type: "basic", count: 1 }],
-    [{ type: "imp", count: 2 }],
-  ],
-  // Boss waves: harder waves after main waves
-  bossWaves: [
-    // Boss wave 1: Big wave with basics and cones
-    [
-      { type: "basic", count: 5 },
-      { type: "cone", count: 5 },
-      { type: "basic", count: 5 },
-    ],
+    { zombies: [{ type: "basic", count: 1 }] },
+    { zombies: [{ type: "basic", count: 1 }] },
+    { zombies: [{ type: "basic", count: 1 }] },
+    { zombies: [{ type: "imp", count: 1 }] },
+    { zombies: [{ type: "basic", count: 2 }] },
+    { zombies: [{ type: "cone", count: 1 }] },
+    { zombies: [{ type: "basic", count: 1 }] },
+    { zombies: [{ type: "imp", count: 2 }] },
+    {
+      zombies: [
+        { type: "basic", count: 5 },
+        { type: "cone", count: 5 },
+        { type: "basic", count: 5 },
+      ], bossWaves: true
+    },
   ],
 };

@@ -9,22 +9,21 @@ export const LEVEL_TUTO: LevelDefinition = {
   betweenWaveDelayMs: 3000,
   waveSpawnIntervalMs: 1200,
   skySunIntervalMs: 10000,
+  reward: { unlockPlants: ["sunflower"] },
   tiles: [
     ["normal", "normalDark", "normal", "normalDark", "normal", "normalDark", "normal", "normalDark"],
   ],
-  // Waves: each batch spawns together, separated by regularSpawnIntervalMs
+  // Each wave batch spawns together; boss waves use the boss spawn timing.
   waves: [
-    [{ type: "basic", count: 1 }],
-    [{ type: "basic", count: 1 }],
-    [{ type: "basic", count: 1 }],
-    [{ type: "basic", count: 1 }],
-    [{ type: "basic", count: 2 }],
-  ],
-  // Boss waves: harder waves after main waves
-  bossWaves: [
-    // Boss wave 1: Big wave with basics and cones
-    [
-      { type: "basic", count: 10 },
-    ],
+    { zombies: [{ type: "basic", count: 1 }] },
+    { zombies: [{ type: "basic", count: 1 }] },
+    { zombies: [{ type: "basic", count: 1 }] },
+    { zombies: [{ type: "basic", count: 1 }] },
+    { zombies: [{ type: "basic", count: 2 }] },
+    {
+      zombies: [
+        { type: "basic", count: 10 },
+      ], bossWaves: true
+    },
   ],
 };
