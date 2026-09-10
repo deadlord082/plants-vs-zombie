@@ -9,6 +9,7 @@ export interface LevelReward {
 
 export interface LevelConfig {
   id: number;
+  unlockAfterLevelId?: number;
   title: string;
   description: string;
   preWaveCount: number;

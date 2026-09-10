@@ -2,8 +2,8 @@ import type { LevelDefinition } from "./types";
 
 export const LEVEL_TUTO: LevelDefinition = {
   id: 0,
-  title: "Level Tutorial",
-  description: "",
+  title: "The First Sprout",
+  description: "Learn the rhythm of planting, collecting sun, and defending one lane.",
   initialDelayMs: 20000,
   regularSpawnIntervalMs: 30000,
   betweenWaveDelayMs: 3000,

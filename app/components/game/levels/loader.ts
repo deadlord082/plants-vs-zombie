@@ -60,6 +60,7 @@ export function compileLevelDefinition(def: LevelDefinition): CompiledLevelConfi
 
   return {
     id: def.id,
+    unlockAfterLevelId: def.unlockAfterLevelId,
     title: def.title,
     description: def.description,
     initialDelayMs: def.initialDelayMs,
@@ -87,6 +88,7 @@ export function compileLevelDefinition(def: LevelDefinition): CompiledLevelConfi
 export function toLevelConfig(compiled: CompiledLevelConfig): LevelConfig {
   return {
     id: compiled.id,
+    unlockAfterLevelId: compiled.unlockAfterLevelId,
     title: compiled.title,
     description: compiled.description,
     preWaveCount: compiled.preWaveCount,

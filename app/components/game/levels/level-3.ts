@@ -2,50 +2,34 @@ import type { LevelDefinition } from "./types";
 
 export const LEVEL_3: LevelDefinition = {
   id: 3,
-  title: "Level 3",
-  description: "Even more challenging level with advanced zombie strategies.",
+  unlockAfterLevelId: 2,
+  title: "Six-Lane Stand",
+  description: "Your full lawn opens up. Wall-nut joins the defense after this level.",
   initialDelayMs: 20000,
   regularSpawnIntervalMs: 30000,
   betweenWaveDelayMs: 3000,
   waveSpawnIntervalMs: 1200,
   skySunIntervalMs: 10000,
-  reward: { unlockPlants: ["cherryBomb"] },
+  reward: { unlockPlants: ["wallNut"] },
   tiles: [
-    ["normal", "normal", "normal", "normal", "normal", "normal"],
-    ["normal", "normal", "normal", "normal", "normal", "normal"],
-    ["normal", "normal", "normal", "normal", "normal", "normal"],
-    ["normal", "normal", "normal", "normal", "normal", "normal"],
+    ["normal", "normalDark", "normal", "normalDark", "normal", "normalDark", "normal", "normal"],
+    ["normalDark", "normal", "normalDark", "normal", "normalDark", "normal", "normalDark", "normal"],
+    ["normal", "normalDark", "normal", "normalDark", "normal", "normalDark", "normal", "normal"],
+    ["normalDark", "normal", "normalDark", "normal", "normalDark", "normal", "normalDark", "normal"],
+    ["normal", "normalDark", "normal", "normalDark", "normal", "normalDark", "normal", "normal"],
+    ["normalDark", "normal", "normalDark", "normal", "normalDark", "normal", "normalDark", "normal"],
   ],
   // Each wave batch spawns together; boss waves use the boss spawn timing.
   waves: [
     { zombies: [{ type: "basic", count: 1 }] },
-    { zombies: [{ type: "imp", count: 1 }] },
-    { zombies: [{ type: "basic", count: 2 }] },
-    { zombies: [{ type: "basic", count: 2 }] },
-    { zombies: [{ type: "cone", count: 1 }] },
-    {
-      zombies: [
-        { type: "basic", count: 8 },
-        { type: "cone", count: 5 },
-        { type: "bucket", count: 2 },
-      ], bossWaves: true
-    },
     { zombies: [{ type: "basic", count: 1 }] },
+    { zombies: [{ type: "basic", count: 2 }] },
+    { zombies: [{ type: "basic", count: 2 }] },
+    { zombies: [{ type: "basic", count: 2 }] },
     {
       zombies: [
-        { type: "cone", count: 5 },
-        { type: "bucket", count: 3 },
-        { type: "basic", count: 4 },
-        { type: "imp", count: 1 },
-      ], bossWaves: true
-    },
-    {
-      zombies: [
-        { type: "cone", count: 8 },
-        { type: "bucket", count: 5 },
-        { type: "gargantuar", count: 1 },
         { type: "basic", count: 5 },
-        { type: "imp", count: 5 },
+        { type: "basic", count: 5 },
       ], bossWaves: true
     },
   ],

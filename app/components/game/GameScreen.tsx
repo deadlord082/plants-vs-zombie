@@ -120,7 +120,6 @@ export default function GameScreen() {
   const [almanacCategory, setAlmanacCategory] = useState<AlmanacCategory>("plants");
   const [shovelSelected, setShovelSelected] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
-  const [selectedLevelId, setSelectedLevelId] = useState(1);
   const [currentLevel, setCurrentLevel] = useState<LevelConfig | null>(null);
   const [sun, setSun] = useState(INITIAL_SUN);
   const [plants, setPlants] = useState<PlantInstance[]>([]);
@@ -287,11 +286,12 @@ export default function GameScreen() {
 
   const startLevel = (levelId: number) => {
     const levelToStart = LEVELS.find((level) => level.id === levelId) || LEVELS[0];
+    if (levelToStart.unlockAfterLevelId !== undefined
+      && !playerDataRef.current.completedLevels.includes(levelToStart.unlockAfterLevelId)) return;
     const compiledLevel = getCompiledLevel(levelId);
     const now = Date.now();
 
     resetGameState();
-    setSelectedLevelId(levelId);
     setCurrentLevel(levelToStart);
     currentLevelRef.current = levelToStart;
     compiledLevelRef.current = compiledLevel;
@@ -970,18 +970,16 @@ export default function GameScreen() {
             <div className="screen-heading"><div><p className="menu-kicker">The backyard awaits</p><h2>Select a Level</h2><p>Each lawn brings a different layout and wave pattern.</p></div><button type="button" onClick={() => setPhase("menu")} className="text-button">Back</button></div>
             <div className="level-card-grid">
               {LEVELS.map((level) => (
-                <div key={level.id} className="level-card">
-                  <div className="level-card-number">{String(level.id).padStart(2, "0")}</div>
+                <div key={level.id} className={`level-card ${level.unlockAfterLevelId !== undefined && !playerData.completedLevels.includes(level.unlockAfterLevelId) ? "locked" : ""}`}>
+                  {playerData.completedLevels.includes(level.id) && <span className="level-completed-ribbon">Completed</span>}
                   <div className="level-card-content">
                     <div>
                       <h2 className="text-2xl font-semibold text-white">{level.title}</h2>
-                      <p>{level.description}</p>
+                      <p>{level.unlockAfterLevelId !== undefined && !playerData.completedLevels.includes(level.unlockAfterLevelId) ? "Complete the previous level to unlock this lawn." : level.description}</p>
                     </div>
                     <div className="level-card-actions">
-                      <button type="button" onClick={() => startLevel(level.id)} className="menu-primary">Play Level <span>→</span></button>
-                      <button type="button" onClick={() => setSelectedLevelId(level.id)} className={`level-preview-button ${selectedLevelId === level.id ? "active" : ""}`}>{selectedLevelId === level.id ? "Selected" : "Preview"}</button>
+                      <button type="button" onClick={() => startLevel(level.id)} disabled={level.unlockAfterLevelId !== undefined && !playerData.completedLevels.includes(level.unlockAfterLevelId)} className="menu-primary disabled:cursor-not-allowed disabled:opacity-50">{level.unlockAfterLevelId !== undefined && !playerData.completedLevels.includes(level.unlockAfterLevelId) ? "Locked" : "Play Level"} <span>{level.unlockAfterLevelId !== undefined && !playerData.completedLevels.includes(level.unlockAfterLevelId) ? "●" : "→"}</span></button>
                     </div>
-                    {playerData.completedLevels.includes(level.id) && <span className="mt-3 inline-block font-semibold text-lime-300">Completed</span>}
                   </div>
                 </div>
               ))}
@@ -1031,7 +1029,7 @@ export default function GameScreen() {
                   <h2>{currentLevel.title}</h2>
                   <p>{currentLevel.description}</p>
                 </div>
-                <div className="loadout-count">{selectedLoadout.length} / {playerData.seedBankSize}</div>
+                <div className="loadout-heading-actions"><button type="button" onClick={() => setPhase("level-select")} className="text-button">Back</button><div className="loadout-count">{selectedLoadout.length} / {playerData.seedBankSize}</div></div>
               </div>
               <div className="plant-choice-grid">
                 {playerData.unlockedPlants.map((plantKey) => {

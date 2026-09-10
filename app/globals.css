@@ -598,8 +598,7 @@ body {
 
 .menu-primary,
 .menu-secondary,
-.text-button,
-.level-preview-button {
+.text-button {
   border: 2px solid #4c2d1b;
   border-radius: 0.4rem;
   font-weight: 900;
@@ -677,6 +676,7 @@ body {
 }
 
 .level-card {
+  position: relative;
   display: flex;
   min-height: 13rem;
   overflow: hidden;
@@ -684,18 +684,6 @@ body {
   border-radius: 0.75rem;
   background: linear-gradient(140deg, #6e9a46 0 44%, #5c3825 44%);
   box-shadow: 0 0.4rem 0 #2c1b13;
-}
-
-.level-card-number {
-  display: flex;
-  flex: 0 0 4.5rem;
-  align-items: flex-start;
-  justify-content: center;
-  padding-top: 1.1rem;
-  color: #f4d67c;
-  font-size: 2rem;
-  font-weight: 900;
-  text-shadow: 2px 2px #385022;
 }
 
 .level-card-content {
@@ -724,15 +712,26 @@ body {
   margin-top: 1rem;
 }
 
-.level-preview-button {
-  padding: 0.65rem 0.8rem;
-  background: #513522;
-  color: #ebc985;
+.level-card.locked {
+  filter: saturate(0.55);
 }
 
-.level-preview-button.active {
-  border-color: #f4d67c;
-  color: #fff4bf;
+.level-completed-ribbon {
+  position: absolute;
+  top: 1rem;
+  right: -2.1rem;
+  z-index: 1;
+  width: 9rem;
+  padding: 0.3rem 0;
+  transform: rotate(35deg);
+  background: #d5e96c;
+  color: #385022;
+  font-size: 0.78rem;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  text-align: center;
+  text-transform: uppercase;
+  box-shadow: 0 0.18rem 0 #385022;
 }
 
 .almanac-tabs {

@@ -17,6 +17,7 @@ export interface WaveDefinition {
 
 export interface LevelDefinition {
   id: number;
+  unlockAfterLevelId?: number;
   title: string;
   description: string;
   initialDelayMs: number;
@@ -35,6 +36,7 @@ export interface LevelDefinition {
  */
 export interface CompiledLevelConfig {
   id: number;
+  unlockAfterLevelId?: number;
   title: string;
   description: string;
   initialDelayMs: number;

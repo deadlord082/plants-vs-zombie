@@ -67,7 +67,7 @@ export const PLANT_SPECS: Record<PlantTypeKey, PlantSpec> = {
     hp: 1,
     cost: 150,
     rechargeMs: 20000,
-    summary: "Explodes after 3 seconds, dealing 1,000 damage to every zombie in a 3x3 area.",
+    summary: "Explodes after 2 seconds, dealing 1,000 damage to every zombie in a 3x3 area.",
     damage: 1000,
   },
 };
