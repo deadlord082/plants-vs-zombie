@@ -21,10 +21,10 @@ export function compileLevelDefinition(def: LevelDefinition): CompiledLevelConfi
   const preWaveCount = regularWaves.reduce((sum, wave) => sum + wave.zombies.reduce((batchSum, spawn) => batchSum + spawn.count, 0), 0);
 
   // Build wave spawn batches; the scheduler releases each zombie at the wave interval.
-  const waveSpawns: Array<Array<{ type: "basic" | "imp" | "cone"; index: number }>> = [];
+  const waveSpawns: Array<Array<{ type: "basic" | "imp" | "cone" | "bucket" | "gargantuar"; index: number }>> = [];
   let zombieIndex = 0;
   for (const wave of def.waves) {
-    const batchZombies: Array<{ type: "basic" | "imp" | "cone"; index: number }> = [];
+    const batchZombies: Array<{ type: "basic" | "imp" | "cone" | "bucket" | "gargantuar"; index: number }> = [];
     for (const spawn of wave.zombies) {
       for (let i = 0; i < spawn.count; i++) {
         batchZombies.push({ type: spawn.type, index: zombieIndex });
@@ -45,9 +45,9 @@ export function compileLevelDefinition(def: LevelDefinition): CompiledLevelConfi
   const wave2Count = bossWaves[2] ? bossWaves[2].zombies.reduce((sum, spawn) => sum + spawn.count, 0) : 0;
 
   // Build boss wave sequences
-  const bossWaveSequences: Array<Array<{ type: "basic" | "imp" | "cone"; index: number }>> = [];
+  const bossWaveSequences: Array<Array<{ type: "basic" | "imp" | "cone" | "bucket" | "gargantuar"; index: number }>> = [];
   for (const bossWave of bossWaves) {
-    const waveSequence: Array<{ type: "basic" | "imp" | "cone"; index: number }> = [];
+    const waveSequence: Array<{ type: "basic" | "imp" | "cone" | "bucket" | "gargantuar"; index: number }> = [];
     zombieIndex = 0;
     for (const spawn of bossWave.zombies) {
       for (let i = 0; i < spawn.count; i++) {

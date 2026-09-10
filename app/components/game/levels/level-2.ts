@@ -33,18 +33,19 @@ export const LEVEL_2: LevelDefinition = {
     },
     {
       zombies: [
-        { type: "cone", count: 5 },
+        { type: "cone", count: 3 },
         { type: "basic", count: 4 },
-        { type: "imp", count: 1 },
       ], bossWaves: true
     },
     { zombies: [{ type: "basic", count: 2 }] },
     { zombies: [{ type: "basic", count: 2 }] },
+    { zombies: [{ type: "basic", count: 3 }] },
+    { zombies: [{ type: "basic", count: 1 }] },
     {
       zombies: [
-        { type: "cone", count: 8 },
-        { type: "basic", count: 5 },
-        { type: "imp", count: 5 },
+        { type: "cone", count: 6 },
+        { type: "bucket", count: 2 },
+        { type: "basic", count: 6 },
       ], bossWaves: true
     },
   ],

@@ -125,13 +125,9 @@ body {
 }
 
 .shovel-button {
+  display: grid;
+  place-items: center;
   width: 4.8rem;
-  font-size: 1.8rem;
-}
-
-.shovel-button span {
-  display: block;
-  font-size: 0.65rem;
 }
 
 .shovel-button.selected,
@@ -419,6 +415,27 @@ body {
   width: 4rem;
   height: 4.6rem;
   object-fit: contain;
+}
+
+.zombie-choice-art {
+  position: relative;
+  flex: 0 0 4rem;
+  width: 4rem;
+  height: 4.6rem;
+}
+
+.zombie-choice-art>img:first-child {
+  width: 100%;
+  height: 100%;
+}
+
+.zombie-choice-art .zombie-choice-hat {
+  position: absolute;
+  top: -24%;
+  left: 36%;
+  width: 42%;
+  height: 42%;
+  transform: translateX(-50%);
 }
 
 .zombie-choice strong,
@@ -789,6 +806,16 @@ body {
   object-fit: contain;
 }
 
+.zombie-armor-falling {
+  animation: zombie-armor-fall 2s ease-in forwards;
+}
+
+.shovel-button img {
+  width: 2.8rem;
+  height: 2.8rem;
+  object-fit: contain;
+}
+
 .almanac-type {
   margin: 0;
   color: #ffe89d;
@@ -864,6 +891,18 @@ body {
 
   50% {
     transform: translateY(-0.35rem);
+  }
+}
+
+@keyframes zombie-armor-fall {
+  0% {
+    opacity: 1;
+    transform: translateY(0) rotate(0deg) scale(1);
+  }
+
+  100% {
+    opacity: 0;
+    transform: translateY(2rem) rotate(18deg) scale(0.85);
   }
 }
 

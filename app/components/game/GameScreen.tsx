@@ -7,7 +7,6 @@ import {
   PROJECTILE_SPEED_PER_TICK,
   SUNFLOWER_FIRST_BURST_MS,
   SUNFLOWER_GENERATION_MS,
-  ZOMBIE_ATTACK_MS,
   ZOMBIE_HP,
   ZOMBIE_MOVE_MS,
   ZOMBIE_SPAWN_OFFSET,
@@ -50,6 +49,41 @@ const getPlantImage = (plantType: PlantTypeKey) => ({
   chomper: "/chomper.webp",
   cherryBomb: "/cherry-bomb.webp",
 }[plantType]);
+
+const getZombieImage = (zombieType: string) => zombieType === "imp" ? "/imp.webp" : zombieType === "gargantuar" ? "/gargantuar.webp" : "/zombie.webp";
+
+const getZombieArmorImage = (zombieType: string, armor: number, armorBrokenAt?: number, now = Date.now()) => {
+  const armorSpec = zombieType === "cone"
+    ? { max: 360, stage: 120, damaged: "/cone-damaged.png", heavilyDamaged: "/cone-heavely-damaged.png" }
+    : zombieType === "bucket"
+      ? { max: 1000, stage: 350, damaged: "/bucket-damaged.png", heavilyDamaged: "/bucket-heavely-damaged.png" }
+      : null;
+  if (!armorSpec || (armor <= 0 && (!armorBrokenAt || now - armorBrokenAt >= 2000))) return null;
+  if (armor <= armorSpec.stage || armorBrokenAt) return armorSpec.heavilyDamaged;
+  if (armor <= armorSpec.max - armorSpec.stage) return armorSpec.damaged;
+  return zombieType === "cone" ? "/cone.png" : "/bucket.png";
+};
+
+const getZombieLabel = (zombieType: string) => zombieType === "basic"
+  ? "Basic zombie"
+  : zombieType === "imp"
+    ? "Imp"
+    : zombieType === "cone"
+      ? "Conehead zombie"
+      : zombieType === "bucket"
+        ? "Buckethead zombie"
+        : "Gargantuar";
+
+const applyZombieDamage = (zombie: ZombieInstance, damage: number, now: number): ZombieInstance => {
+  const armorDamage = Math.min(zombie.armor, damage);
+  const armor = zombie.armor - armorDamage;
+  return {
+    ...zombie,
+    armor,
+    hp: Math.max(0, zombie.hp - (damage - armorDamage)),
+    armorBrokenAt: zombie.armor > 0 && armor === 0 ? now : zombie.armorBrokenAt,
+  };
+};
 
 const getGridRows = (level: LevelConfig | null) => level?.tiles.length || 0;
 const getGridCols = (level: LevelConfig | null) => level?.tiles[0]?.length || 0;
@@ -621,10 +655,41 @@ export default function GameScreen() {
     const explodingCherryBombs = nextPlants.filter(
       (plant) => plant.type === "cherryBomb" && plant.cherryBombExplodesAt && now >= plant.cherryBombExplodesAt,
     );
+    const getZombieImage = (zombieType: string) => zombieType === "imp" ? "/imp.webp" : zombieType === "gargantuar" ? "/gargantuar.webp" : "/zombie.webp";
+    const getZombieArmorImage = (zombieType: string, armor: number, armorBrokenAt?: number, now = Date.now()) => {
+      const armorSpec = zombieType === "cone"
+        ? { max: 360, stage: 120, damaged: "/cone-damaged.png", heavilyDamaged: "/cone-heavely-damaged.png" }
+        : zombieType === "bucket"
+          ? { max: 1000, stage: 350, damaged: "/bucket-damaged.png", heavilyDamaged: "/bucket-heavely-damaged.png" }
+          : null;
+      if (!armorSpec || (armor <= 0 && (!armorBrokenAt || now - armorBrokenAt >= 2000))) return null;
+      if (armor <= armorSpec.stage || armorBrokenAt) return armorSpec.heavilyDamaged;
+      if (armor <= armorSpec.max - armorSpec.stage) return armorSpec.damaged;
+      return zombieType === "cone" ? "/cone.png" : "/bucket.png";
+    };
+    const getZombieLabel = (zombieType: string) => zombieType === "basic"
+      ? "Basic zombie"
+      : zombieType === "imp"
+        ? "Imp"
+        : zombieType === "cone"
+          ? "Conehead zombie"
+          : zombieType === "bucket"
+            ? "Buckethead zombie"
+            : "Gargantuar";
+    const applyZombieDamage = (zombie: ZombieInstance, damage: number, now: number): ZombieInstance => {
+      const armorDamage = Math.min(zombie.armor, damage);
+      const armor = zombie.armor - armorDamage;
+      return {
+        ...zombie,
+        armor,
+        hp: Math.max(0, zombie.hp - (damage - armorDamage)),
+        armorBrokenAt: zombie.armor > 0 && armor === 0 ? now : zombie.armorBrokenAt,
+      };
+    };
     for (const cherryBomb of explodingCherryBombs) {
       nextZombies = nextZombies.map((zombie) => {
         const inBlast = Math.abs(zombie.row - cherryBomb.row) <= 1 && Math.abs(Math.floor(zombie.x) - cherryBomb.col) <= 1;
-        return inBlast ? { ...zombie, hp: Math.max(0, zombie.hp - 1000) } : zombie;
+        return inBlast ? applyZombieDamage(zombie, 1000, now) : zombie;
       });
     }
     if (explodingCherryBombs.length > 0) {
@@ -707,12 +772,7 @@ export default function GameScreen() {
         }
 
         if (now - (plant.lastContactAt || 0) >= CHOMPER_BITE_MS) {
-          let damageToHp = 40;
-          const newArmor = Math.max(0, target.armor - 40);
-          damageToHp = Math.max(0, 40 - (target.armor - newArmor));
-          nextZombies = nextZombies.map((zombie) => zombie.id === target.id
-            ? { ...zombie, armor: newArmor, hp: Math.max(0, zombie.hp - damageToHp) }
-            : zombie);
+          nextZombies = nextZombies.map((zombie) => zombie.id === target.id ? applyZombieDamage(zombie, 40, now) : zombie);
           return { ...plant, lastContactAt: now };
         }
       }
@@ -731,18 +791,7 @@ export default function GameScreen() {
         .sort((a, b) => a.x - b.x)[0];
 
       if (hitZombie) {
-        let damageToHP = moved.damage;
-        let newArmor = hitZombie.armor;
-        // Armor absorbs damage first
-        if (newArmor > 0) {
-          newArmor = Math.max(0, newArmor - moved.damage);
-          damageToHP = moved.damage - (hitZombie.armor - newArmor);
-        }
-        nextZombies = nextZombies.map((z) =>
-          z.id === hitZombie.id
-            ? { ...z, armor: newArmor, hp: Math.max(0, z.hp - damageToHP) }
-            : z
-        );
+        nextZombies = nextZombies.map((z) => z.id === hitZombie.id ? applyZombieDamage(z, moved.damage, now) : z);
         return acc; // projectile consumed
       }
 
@@ -758,12 +807,15 @@ export default function GameScreen() {
     nextZombies = nextZombies.map((zombie) => {
       const plantIndex = nextPlants.findIndex((plant) => plant.row === zombie.row && Math.floor(zombie.x) === plant.col);
       if (plantIndex >= 0 && zombie.hp > 0) {
-        // stop moving and attack the plant periodically
-        if (now - zombie.lastAttackAt >= ZOMBIE_ATTACK_MS) {
+        // Establish contact first, then wait one attack interval before biting.
+        const zombieSpec = ZOMBIE_SPECS[zombie.type] || ZOMBIE_SPECS.basic;
+        if (zombie.contactStartedAt === undefined) {
+          zombie = { ...zombie, contactStartedAt: now };
+        } else if (now - zombie.contactStartedAt >= zombieSpec.attackMs && now - zombie.lastAttackAt >= zombieSpec.attackMs) {
           const plant = nextPlants[plantIndex];
           nextPlants[plantIndex] = plant.type === "cherryBomb"
             ? plant
-            : { ...plant, hp: Math.max(0, plant.hp - (ZOMBIE_SPECS[zombie.type]?.damage || 50)) };
+            : { ...plant, hp: Math.max(0, plant.hp - zombieSpec.damage) };
           zombie = { ...zombie, lastAttackAt: now };
         }
 
@@ -772,18 +824,7 @@ export default function GameScreen() {
         const spec = PLANT_SPECS[plant.type];
         const contactInterval = spec.shootMs || PEASHOOTER_SHOOT_MS;
         if (plant.type !== "chomper" && spec.damage && now - (plant.lastContactAt || 0) >= contactInterval) {
-          let damageToHP = spec.damage;
-          let newArmor = zombie.armor;
-          // Armor absorbs damage first
-          if (newArmor > 0) {
-            newArmor = Math.max(0, newArmor - spec.damage);
-            damageToHP = spec.damage - (zombie.armor - newArmor);
-          }
-          nextZombies = nextZombies.map((z) =>
-            z.id === zombie.id
-              ? { ...z, armor: newArmor, hp: Math.max(0, z.hp - damageToHP) }
-              : z
-          );
+          zombie = applyZombieDamage(zombie, spec.damage, now);
           nextPlants[plantIndex] = { ...plant, lastContactAt: now };
         }
 
@@ -798,7 +839,7 @@ export default function GameScreen() {
       const phase = (elapsedMs / walkPeriodMs) * Math.PI * 2;
       const speedMultiplier = 1 + 0.9 * Math.sin(phase); // varies from 0.65 to 1.35
       const newX = zombie.x - (speedPerTick * speedMultiplier);
-      return { ...zombie, x: newX };
+      return { ...zombie, x: newX, contactStartedAt: undefined };
     });
 
     nextZombies.forEach((zombie) => {
@@ -975,7 +1016,7 @@ export default function GameScreen() {
             </div>
             <div className="almanac-grid">
               {almanacCategory === "plants" && Object.values(PLANT_SPECS).map((spec) => <article key={spec.key} className="almanac-card"><div className="almanac-art plant-art"><img src={getPlantImage(spec.key)} alt="" /></div><div><p className="almanac-type">Plant</p><h3>{spec.name}</h3><p>{spec.summary}</p><dl><div><dt>Cost</dt><dd>{spec.cost} sun</dd></div><div><dt>Health</dt><dd>{spec.hp} HP</dd></div><div><dt>Recharge</dt><dd>{spec.rechargeMs / 1000}s</dd></div>{spec.damage && <div><dt>Damage</dt><dd>{spec.damage}</dd></div>}</dl></div></article>)}
-              {almanacCategory === "zombies" && Object.values(ZOMBIE_SPECS).map((spec) => <article key={spec.key} className="almanac-card"><div className="almanac-art zombie-art">{spec.key === "basic" ? <img src="/zombie.webp" alt="" /> : <span className={`zombie-placeholder ${spec.key}`}>{spec.key === "imp" ? "IMP" : "CONE"}</span>}</div><div><p className="almanac-type">Zombie</p><h3>{spec.name}</h3><p>{spec.summary}</p><dl><div><dt>Health</dt><dd>{spec.hp} HP</dd></div><div><dt>Speed</dt><dd>{Math.round(spec.moveMs / 100) / 10}s / tile</dd></div><div><dt>Damage</dt><dd>{spec.damage}</dd></div><div><dt>Armor</dt><dd>{spec.armor}</dd></div></dl></div></article>)}
+              {almanacCategory === "zombies" && Object.values(ZOMBIE_SPECS).map((spec) => <article key={spec.key} className="almanac-card"><div className="almanac-art zombie-art relative"><img src={getZombieImage(spec.key)} alt="" />{(spec.key === "cone" || spec.key === "bucket") && <img src={spec.key === "cone" ? "/cone.png" : "/bucket.png"} alt="" className="absolute object-contain" style={{ width: "33.333%", height: "33.333%", left: "40%", top: "18%", transform: "translateX(-50%)" }} />}</div><div><p className="almanac-type">Zombie</p><h3>{spec.name}</h3><p>{spec.summary}</p><dl><div><dt>Health</dt><dd>{spec.hp} HP</dd></div><div><dt>Speed</dt><dd>{Math.round(spec.moveMs / 100) / 10}s / tile</dd></div><div><dt>Damage</dt><dd>{spec.damage}</dd></div><div><dt>Attack</dt><dd>{spec.attackMs / 1000}s</dd></div><div><dt>Armor</dt><dd>{spec.armor}</dd></div></dl></div></article>)}
               {almanacCategory === "tiles" && Object.values(TILE_DEFINITIONS).map((tile) => <article key={tile.key} className="almanac-card tile-card"><div className={`almanac-tile-swatch ${tile.key}`} /><div><p className="almanac-type">Tile</p><h3>{tile.key === "normalDark" ? "Dark lawn" : tile.key === "normal" ? "Lawn" : "Obstructed"}</h3><p>{tile.description}</p><dl><div><dt>Plantable</dt><dd>{tile.canPlant ? "Yes" : "No"}</dd></div><div><dt>Label</dt><dd>{tile.label || "None"}</dd></div></dl></div></article>)}
             </div>
           </div>
@@ -1016,8 +1057,7 @@ export default function GameScreen() {
               <div className="loadout-heading"><div><p className="loadout-kicker">Incoming threats</p><h2>Zombies</h2></div><span className="zombie-count">{zombieTypes.length}</span></div>
               <div className="zombie-choice-list">
                 {zombieTypes.map((zombieType) => {
-                  const zombieLabel = zombieType === "basic" ? "Basic zombie" : zombieType === "imp" ? "Imp" : "Conehead zombie";
-                  return <div key={zombieType} className="zombie-choice">{zombieType === "basic" ? <img src="/zombie.webp" alt="" /> : <span className={`zombie-placeholder ${zombieType}`}>{zombieType === "imp" ? "IMP" : "CONE"}</span>}<div><strong>{zombieLabel}</strong></div></div>;
+                  return <div key={zombieType} className="zombie-choice"><div className="zombie-choice-art"><img src={getZombieImage(zombieType)} alt="" />{(zombieType === "cone" || zombieType === "bucket") && <img src={zombieType === "cone" ? "/cone.png" : "/bucket.png"} alt="" className="zombie-choice-hat" />}</div><div><strong>{getZombieLabel(zombieType)}</strong></div></div>;
                 })}
               </div>
             </aside>
@@ -1046,7 +1086,7 @@ export default function GameScreen() {
                 })}
                 {Array.from({ length: Math.max(0, playerData.seedBankSize - selectedLoadout.length) }).map((_, index) => <div key={`empty-${index}`} className="seed-slot empty" aria-hidden="true" />)}
               </div>
-              <button type="button" aria-label="Select shovel" onClick={() => setShovelSelected((selected) => !selected)} className={`shovel-button ${shovelSelected ? "selected" : ""}`}>⌁<span>Shovel</span></button>
+              <button type="button" aria-label="Select shovel" onClick={() => setShovelSelected((selected) => !selected)} className={`shovel-button ${shovelSelected ? "selected" : ""}`}><img src="/shovel.webp" alt="" /></button>
               <button type="button" aria-label="Open pause menu" onClick={() => setIsPaused(true)} className="settings-button">⚙</button>
             </div>
 
@@ -1063,11 +1103,11 @@ export default function GameScreen() {
                       onClick={() => handlePlacePlant(row, col)}
                       disabled={!tile.canPlant}
                       aria-label={tile.label || "Available lawn tile"}
-                      className={`relative min-h-16 overflow-hidden p-2 text-left transition ${tile.className}`}
+                      className={`relative z-0 min-h-16 overflow-visible p-2 text-left transition ${tile.className}`}
                     >
                       {tile.label && !plant && <span className="text-xs font-semibold uppercase tracking-wide text-stone-200">{tile.label}</span>}
                       {plant && (
-                        <div className="relative h-full w-full text-xs text-lime-200">
+                        <div className="relative z-10 h-full w-full text-xs text-lime-200">
                           {(() => {
                             const wallNutImage = plant.type === "wallNut"
                               ? plant.hp <= 1000 ? "/wall-nut-heavely-damaged.webp" : plant.hp <= 2500 ? "/wall-nut-damaged.webp" : "/wall-nut.webp"
@@ -1152,15 +1192,9 @@ export default function GameScreen() {
 
                 {/* Zombie overlay: render zombies absolutely so they can move smoothly (fractional x) */}
                 {zombies.map((z) => {
-                  let zombieLabel = "Z";
-                  let bgColor = "bg-rose-500/90";
-                  if (z.type === "imp") {
-                    zombieLabel = "IMP";
-                    bgColor = "bg-purple-600/90";
-                  } else if (z.type === "cone") {
-                    zombieLabel = "CONE";
-                    bgColor = "bg-yellow-600/90";
-                  }
+                  const armorImage = getZombieArmorImage(z.type, z.armor, z.armorBrokenAt, gameTime);
+                  const armorIsFalling = Boolean(z.armorBrokenAt && gameTime - z.armorBrokenAt < 2000);
+                  const zombieImage = getZombieImage(z.type);
                   return (
                     <div
                       key={z.id}
@@ -1172,23 +1206,10 @@ export default function GameScreen() {
                         transition: `left ${GAME_TICK_MS}ms linear, top ${GAME_TICK_MS}ms linear`,
                       }}
                     >
-                      {z.type === "basic" ? (
-                        <>
-                          <img
-                            src="/zombie.webp"
-                            alt="Basic zombie"
-                            className="h-20 w-20 origin-bottom object-contain"
-                            style={{ transform: "scale(1.1)" }}
-                            onError={(event) => {
-                              event.currentTarget.remove();
-                              event.currentTarget.nextElementSibling?.classList.remove("hidden");
-                            }}
-                          />
-                          <div className={`hidden rounded-full ${bgColor} px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-white`}>{zombieLabel}</div>
-                        </>
-                      ) : (
-                        <div className={`rounded-full ${bgColor} px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-white`}>{zombieLabel}</div>
-                      )}
+                      <div className={`relative ${z.type === "gargantuar" ? "h-32 w-32" : z.type === "imp" ? "h-16 w-16" : "h-20 w-20"}`}>
+                        <img src={zombieImage} alt={getZombieLabel(z.type)} className="absolute inset-0 h-full w-full origin-bottom object-contain" />
+                        {armorImage && <img src={armorImage} alt="" className={`absolute origin-bottom object-contain ${armorIsFalling ? "zombie-armor-falling" : ""}`} style={{ width: "45%", height: "45%", left: "38%", top: "-28%", transform: "translateX(-50%)" }} />}
+                      </div>
                       {showDebugHealth && <div className="mt-1 text-[10px] text-white text-center bg-rose-500/80 rounded-full px-2 py-0.5">HP: {z.hp}{z.armor > 0 ? ` | A: ${z.armor}` : ""}</div>}
                     </div>
                   );
@@ -1285,168 +1306,3 @@ export default function GameScreen() {
     </div>
   );
 }
-
-//   return (
-//     <div className="min-h-screen bg-slate-950 text-slate-100 px-4 py-8 sm:px-8">
-//       <div className="mx-auto max-w-7xl">
-//         <h1 className="text-4xl font-bold tracking-tight text-lime-300">{title}</h1>
-
-//         {phase === "menu" && (
-//           <div className="mt-12 flex flex-col items-center gap-6">
-//             <p className="max-w-2xl text-lg text-slate-300">
-//               This prototype includes a simple menu, a level selection screen, a 12x6 lawn grid, sun currency, two plant types, and a basic zombie wave system.
-//             </p>
-//             <button
-//               type="button"
-//               onClick={() => setPhase("level-select")}
-//               className="rounded-full bg-lime-500 px-7 py-3 text-lg font-semibold text-slate-950 transition hover:bg-lime-400"
-//             >
-//               Start Game
-//             </button>
-//           </div>
-//         )}
-
-//         {phase === "level-select" && (
-//           <div className="mt-12 grid gap-6 sm:grid-cols-2">
-//             <div className="rounded-3xl border border-slate-700 bg-slate-900/80 p-6 shadow-xl">
-//               <div className="flex items-center justify-between gap-4">
-//                 <div>
-//                   <h2 className="text-2xl font-semibold text-white">Level 1</h2>
-//                   <p className="mt-2 text-slate-400">Easy introduction level with a small first wave and one big wave.</p>
-//                 </div>
-//                 <span className="rounded-full bg-lime-500 px-3 py-1 text-sm font-semibold text-slate-950">1</span>
-//               </div>
-//               <div className="mt-6 flex gap-3">
-//                 <button
-//                   type="button"
-//                   onClick={startLevel}
-//                   className="rounded-full bg-lime-500 px-5 py-3 font-semibold text-slate-950 transition hover:bg-lime-400"
-//                 >
-//                   Play Level 1
-//                 </button>
-//               </div>
-//             </div>
-//           </div>
-//         )}
-
-//         {(phase === "playing" || phase === "complete") && (
-//           <div className="mt-10 space-y-6">
-//             <div className="grid gap-4 rounded-3xl border border-slate-700 bg-slate-900/80 p-6 shadow-xl sm:grid-cols-[1fr_auto]">
-//               <div className="space-y-4">
-//                 <div className="flex flex-wrap items-center gap-4">
-//                   <div className="rounded-2xl bg-slate-800/90 px-4 py-3 text-slate-100">
-//                     Sun: <span className="font-semibold text-lime-300">{sun}</span>
-//                   </div>
-//                   <div className="rounded-2xl bg-slate-800/90 px-4 py-3 text-slate-100">Selected: <span className="font-semibold text-lime-300">{selectedSpec.name}</span></div>
-//                 </div>
-
-//                 <div className="grid gap-4 sm:grid-cols-2">
-//                   {Object.values(PLANT_SPECS).map((spec) => {
-//                     const ready = plantReadyRef.current[spec.key] <= gameTime;
-//                     const enoughSun = sunRef.current >= spec.cost;
-//                     const disabled = !ready || !enoughSun;
-//                     const coolDown = Math.max(0, Math.ceil((plantReadyRef.current[spec.key] - gameTime) / 1000));
-//                     return (
-//                       <button
-//                         key={spec.key}
-//                         type="button"
-//                         disabled={disabled}
-//                         onClick={() => setSelectedPlant(spec.key)}
-//                         className={`rounded-3xl border px-4 py-4 text-left transition ${selectedPlant === spec.key ? "border-lime-400 bg-slate-800" : "border-slate-700 bg-slate-900/80"} ${disabled ? "cursor-not-allowed opacity-70" : "hover:border-lime-300"}`}
-//                       >
-//                         <div className="flex items-center justify-between gap-3">
-//                           <div>
-//                             <h3 className="text-lg font-semibold text-white">{spec.name}</h3>
-//                             <p className="mt-1 text-sm text-slate-400">{spec.summary}</p>
-//                           </div>
-//                           <div className="rounded-full bg-slate-800 px-3 py-1 text-sm text-lime-300">{spec.cost}☀</div>
-//                         </div>
-//                         <div className="mt-3 text-sm text-slate-300">
-//                           {ready ? "Ready to place" : `Recharge ${coolDown}s`}
-//                         </div>
-//                       </button>
-//                     );
-//                   })}
-//                 </div>
-//               </div>
-
-//               <div className="space-y-4 rounded-3xl bg-slate-950/90 p-4">
-//                 <div className="text-sm uppercase tracking-[0.24em] text-slate-400">Progress</div>
-//                 <div className="relative h-4 overflow-hidden rounded-full bg-slate-800">
-//                   <div className="h-full bg-lime-400 transition-all" style={{ width: `${Math.min(100, progressPercent)}%` }} />
-//                   <div className="absolute right-0 top-0 h-full w-1 bg-orange-500" />
-//                 </div>
-//                 <div className="flex items-center justify-between text-sm text-slate-300">
-//                   <span>{regularSpawned} / {REGULAR_ZOMBIE_COUNT} regular zombies sent</span>
-//                   <span className="flex items-center gap-1 text-lime-300">🚩 Wave incoming</span>
-//                 </div>
-//                 <div className="rounded-3xl border border-slate-700 bg-slate-900/80 p-4 text-sm text-slate-300">
-//                   <div className="font-semibold text-white">Wave status</div>
-//                   <p className="mt-2">{waveActive ? "Big wave in progress" : regularSpawnedRef.current === REGULAR_ZOMBIE_COUNT ? "Preparing the final wave..." : "Regular zombies are marching."}</p>
-//                   <p className="mt-2 text-sm text-slate-400">Warm-up: {WAVE_ZOMBIE_COUNT} zombies will arrive after the regular group.</p>
-//                 </div>
-//                 <button
-//                   type="button"
-//                   onClick={() => setPhase("menu")}
-//                   className="rounded-full bg-slate-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-600"
-//                 >
-//                   Back to menu
-//                 </button>
-//               </div>
-//             </div>
-
-//             <div className="overflow-hidden rounded-3xl border border-slate-700 bg-slate-900/90 p-4 shadow-xl">
-//               <div className="grid gap-1 bg-slate-950 p-1 sm:p-2" style={{ gridTemplateColumns: `repeat(${GRID_COLS}, minmax(0, 1fr))` }}>
-//                 {grid.flat().map(({ row, col }) => {
-//                   const plant = plants.find((item) => item.row === row && item.col === col);
-//                   const zombie = zombies.find((item) => item.row === row && item.col === col);
-//                   const projectile = projectiles.find((item) => item.row === row && Math.floor(item.x) === col);
-
-//                   return (
-//                     <button
-//                       key={tileKey(row, col)}
-//                       type="button"
-//                       onClick={() => handlePlacePlant(row, col)}
-//                       className="relative min-h-16 overflow-hidden rounded-2xl border border-slate-800 bg-slate-950/80 p-2 text-left transition hover:border-lime-400"
-//                     >
-//                       <div className="absolute inset-x-0 top-0 h-1 bg-slate-800" />
-//                       {plant && (
-//                         <div className="flex h-full w-full flex-col justify-between rounded-2xl border border-lime-500/20 bg-lime-500/10 p-2 text-xs text-lime-200">
-//                           <span>{PLANT_SPECS[plant.type].name}</span>
-//                           <span className="text-[11px] text-slate-200">HP: {plant.hp}</span>
-//                         </div>
-//                       )}
-//                       {zombie && (
-//                         <div className="absolute right-2 top-2 rounded-full bg-rose-500/90 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-white">
-//                           Zombie
-//                         </div>
-//                       )}
-//                       {projectile && (
-//                         <div className="absolute left-1/2 top-1/2 h-2 w-2 -translate-y-1/2 -translate-x-1/2 rounded-full bg-cyan-300" />
-//                       )}
-//                     </button>
-//                   );
-//                 })}
-//               </div>
-//             </div>
-//           </div>
-//         )}
-//       </div>
-
-//       {levelComplete && (
-//         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/90 px-4 py-8">
-//           <div className="w-full max-w-xl rounded-3xl border border-lime-400 bg-slate-900/95 p-8 text-center shadow-2xl">
-//             <h2 className="text-3xl font-semibold text-white">Level Complete!</h2>
-//             <p className="mt-4 text-slate-300">All zombies have been defeated. Great job on your first level.</p>
-//             <button
-//               type="button"
-//               onClick={() => setPhase("menu")}
-//               className="mt-8 inline-flex rounded-full bg-lime-500 px-6 py-3 text-lg font-semibold text-slate-950 transition hover:bg-lime-400"
-//             >
-//               Return to main menu
-//             </button>
-//           </div>
-//         </div>
-//       )}
-//     </div>
-//   );

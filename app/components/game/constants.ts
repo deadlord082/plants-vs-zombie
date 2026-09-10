@@ -1,4 +1,4 @@
-import type { LevelConfig, PlantSpec, PlantTypeKey } from "./types";
+import type { PlantSpec, PlantTypeKey } from "./types";
 
 export const INITIAL_SUN = 50;
 export const ZOMBIE_HP = 200;
@@ -116,6 +116,28 @@ export const ZOMBIE_SPECS: Record<string, ZombieSpec> = {
     moveMs: ZOMBIE_MOVE_MS,
     attackMs: ZOMBIE_ATTACK_MS,
     damage: 50,
-    armor: 340,
+    armor: 360,
+  },
+  bucket: {
+    key: "bucket",
+    name: "Buckethead Zombie",
+    summary: "A durable zombie protected by a bucket that absorbs heavy damage.",
+    coinDropChance: 0.02,
+    hp: ZOMBIE_HP,
+    moveMs: ZOMBIE_MOVE_MS,
+    attackMs: ZOMBIE_ATTACK_MS,
+    damage: 50,
+    armor: 1000,
+  },
+  gargantuar: {
+    key: "gargantuar",
+    name: "Gargantuar",
+    summary: "A massive zombie that moves slowly but hits plants with devastating force.",
+    coinDropChance: 0.1,
+    hp: 3600,
+    moveMs: ZOMBIE_MOVE_MS * 1.5,
+    attackMs: 2000,
+    damage: 2000,
+    armor: 0,
   },
 };

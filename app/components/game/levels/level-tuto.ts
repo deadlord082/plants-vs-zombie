@@ -20,9 +20,10 @@ export const LEVEL_TUTO: LevelDefinition = {
     { zombies: [{ type: "basic", count: 1 }] },
     { zombies: [{ type: "basic", count: 1 }] },
     { zombies: [{ type: "basic", count: 2 }] },
+    { zombies: [{ type: "basic", count: 1 }] },
     {
       zombies: [
-        { type: "basic", count: 10 },
+        { type: "basic", count: 5 },
       ], bossWaves: true
     },
   ],

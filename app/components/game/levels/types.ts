@@ -6,7 +6,7 @@ import type { TileType } from "../tiles";
 import type { LevelReward } from "../types";
 
 export interface ZombieSpawn {
-  type: "basic" | "imp" | "cone";
+  type: "basic" | "imp" | "cone" | "bucket" | "gargantuar";
   count: number;
 }
 
@@ -51,11 +51,11 @@ export interface CompiledLevelConfig {
   midCount: number;
   wave2Count: number;
   // Compiled regular wave batches, retained for progress and Almanac data.
-  waveSpawns: Array<Array<{ type: "basic" | "imp" | "cone"; index: number }>>;
+  waveSpawns: Array<Array<{ type: "basic" | "imp" | "cone" | "bucket" | "gargantuar"; index: number }>>;
   // Boss wave sequences
-  bossWaveSequences: Array<Array<{ type: "basic" | "imp" | "cone"; index: number }>>;
+  bossWaveSequences: Array<Array<{ type: "basic" | "imp" | "cone" | "bucket" | "gargantuar"; index: number }>>;
   spawnWaves: Array<{
-    zombies: Array<{ type: "basic" | "imp" | "cone"; index: number }>;
+    zombies: Array<{ type: "basic" | "imp" | "cone" | "bucket" | "gargantuar"; index: number }>;
     isBoss: boolean;
   }>;
   totalZombieCount: number;

@@ -66,6 +66,8 @@ export interface ZombieInstance {
   isWave: boolean;
   spawnedAt: number;
   type: string;
+  armorBrokenAt?: number;
+  contactStartedAt?: number;
 }
 
 export interface Projectile {
