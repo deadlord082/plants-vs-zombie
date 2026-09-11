@@ -2,6 +2,7 @@ import type { LevelDefinition } from "./types";
 
 export const LEVEL_test: LevelDefinition = {
   id: 99999,
+  category: "mini-game",
   title: "test level",
   description: "a test level for dev purpose, isn't push in prod",
   initialDelayMs: 5000,
@@ -9,6 +10,7 @@ export const LEVEL_test: LevelDefinition = {
   betweenWaveDelayMs: 3000,
   waveSpawnIntervalMs: 1200,
   skySunIntervalMs: 1000,
+  gloveRechargeMs: 0,
   tiles: [
     ["normal", "normalDark", "normal", "normalDark", "normal", "normalDark", "normal", "normalDark"],
     ["normalDark", "normal", "normalDark", "normal", "normalDark", "normal", "normalDark", "normal"],

@@ -14,6 +14,8 @@ This repository is a Next.js remake of Plants vs. Zombies. The main game screen 
 - The game has menu, level selection, loadout, Almanac, playing, complete, and game-over phases.
 - Starting a level from level selection opens the loadout screen first. Gameplay must not begin until the player selects at least one plant and clicks Start level.
 - The loadout screen shows selectable unlocked plants, a level-specific roster of distinct zombie types, and a configurable seed bank. Keep the bank capacity in player data so future seed-slot upgrades can increase it without changing the UI structure.
+- Completing a level commits its first-time reward immediately, then presents the reward in the world at the final defeated zombie's position. Plant and glove rewards use a clickable card that grows into the center through a white transition; money rewards use a money bag that shrinks while gold coins burst outward. After the screen is fully white, switch to level selection before fading back in.
+- Levels with no reward, and replayed completed levels with no collectible reward remaining, wait for the player to click the completed lawn before running the same white transition to level selection. Do not show an empty reward card.
 - Players spend sun to plant unlocked sunflowers, pea shooters, Wall-nuts, Chompers, and Cherry Bombs on available lawn tiles.
 - Sunflowers generate sun over time. Pea shooters fire projectiles at zombies in the same row.
 - Wall-nuts have 4,000 HP and use progressively damaged sprites as their HP falls.
@@ -30,10 +32,11 @@ This repository is a Next.js remake of Plants vs. Zombies. The main game screen 
 
 ### Player Progression and Money
 
-- Persist player progression in browser `localStorage` under the `plants-vs-zombie-player` key. The stored player data contains integer `money`, `unlockedPlants`, completed level IDs, `seedBankSize`, and `seedSlotsPurchased`.
+- Persist player progression in browser `localStorage` under the `plants-vs-zombie-player` key. The stored player data contains integer `money`, `unlockedPlants`, completed level IDs, `seedBankSize`, `seedSlotsPurchased`, and boolean `gloveUnlocked`.
 - A new player starts with zero money, only the `peaShooter` unlocked, no completed levels, and the initial six seed slots.
-- Completion rewards are declared by each level's `reward` field. A reward may contain `money`, `unlockPlants`, or both. Current levels unlock `sunflower` after the tutorial, `wallNut` after level 1, `chomper` after level 2, and `cherryBomb` after level 3.
+- Completion rewards are declared by each level's `reward` field. A reward may contain `money`, `unlockPlants`, or `glove`. Current levels unlock `sunflower` after the tutorial, `wallNut` after level 1, `chomper` after level 2, `cherryBomb` after level 3, and the glove after level 10.
 - Completion rewards and plant unlocks are granted only the first time a level is completed. Replaying a completed level must not grant its reward again, though the level remains playable.
+- A replayed completed level must still use the rewardless completion transition rather than returning abruptly to the level selector.
 - The level selector displays completed levels, and the main menu displays the player's money and seed capacity.
 - The Shop offers exactly two one-time seed-slot purchases: the first costs `$50,000`, and the second costs `$80,000`. Once both are purchased, no further seed-slot purchase is available.
 - Money must remain a non-negative integer. Collectible coin money is added to the same persisted player balance.
@@ -67,6 +70,7 @@ Each level must define a rectangular `tiles` matrix in its own level file:
 - Every row must have the same width and the matrix must not be empty.
 - Do not reintroduce global fixed grid dimensions; derive dimensions from the active level.
 - Each level has one ordered `waves` array. Every entry uses `{ zombies: [{ type, count }], bossWaves?: boolean }`; `bossWaves` is a marker for boss progress visuals, not a separate spawn collection.
+- Level definitions may set `gloveRechargeMs`; compiled levels default to a 10-second glove cooldown. The test level belongs to the `mini-game` category and sets the glove cooldown to zero.
 - Regular and boss zombies are compiled into one ordered runtime sequence. Zombies within every wave spawn at `waveSpawnIntervalMs`, so multiple zombies do not appear perfectly aligned.
 - Regular waves advance when the previous regular batch's combined HP falls below 50%, with `regularSpawnIntervalMs` retained as the timer fallback. Boss waves use the same per-zombie timing and follow the same ordered sequence.
 - Level rewards belong in the level definition's `reward` field rather than hard-coded level-ID conditions in `GameScreen.tsx`.
@@ -99,6 +103,9 @@ Tile types are declared in `app/components/game/tiles.ts`. Each tile definition 
 - Cone and bucket art is rendered as a small overlay on top of the normal zombie sprite, not as a replacement sprite. Keep the overlay positioned independently for the Almanac, loadout roster, and in-game zombie; the loadout and in-game overlays should remain above the zombie's head and aligned toward its center.
 - The loadout roster must use a positioned image wrapper so cone and bucket overlays align with the zombie sprite rather than the whole roster row. The Almanac and loadout use the supplied `cone.webp` and `bucket.webp` assets.
 - The shovel control uses `public/shovel.webp` as a centered icon-only button with no visible text label.
+- Once unlocked, the glove control appears beside the shovel and uses `public/glove.webp`. Selecting either tool displays a small tool image cursor anchored by its bottom-left corner; the dragged plant preview appears beneath the glove cursor at twice the tool cursor size.
+- The glove moves plants by pointer drag-and-drop: press a plant, release over an empty plantable tile, and reject occupied or obstructed destinations. A successful move starts the active level's glove cooldown.
+- Plant sprites use a subtle idle deformation animation so the lawn feels alive. Preserve existing sprite-specific transforms for sleeping Chompers, growing Cherry Bombs, and damaged Wall-nuts.
 - Plant sprites may extend beyond their lawn cell bounds so large artwork is not cropped by the cell border; keep the plant layer above the tile layer.
 - The project uses a debug-only health overlay: press `H` to toggle health text for all plants and zombies, defaulting to hidden.
 

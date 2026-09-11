@@ -128,6 +128,24 @@ body {
   display: grid;
   place-items: center;
   width: 4.8rem;
+  position: relative;
+}
+
+.shovel-button img {
+  width: 3.2rem;
+  height: 3.2rem;
+  object-fit: contain;
+}
+
+.shovel-button small {
+  position: absolute;
+  right: 0.15rem;
+  bottom: 0.1rem;
+  padding: 0 0.2rem;
+  border-radius: 0.2rem;
+  background: #47301e;
+  color: #ffe6a3;
+  font-size: 0.72rem;
 }
 
 .shovel-button.selected,
@@ -138,6 +156,64 @@ body {
 .settings-button {
   width: 3.5rem;
   font-size: 1.7rem;
+}
+
+.glove-button img {
+  transform: rotate(-12deg);
+}
+
+.shovel-cursor,
+.shovel-cursor button,
+.glove-cursor,
+.glove-cursor button {
+  cursor: none;
+}
+
+.tool-cursor-image {
+  position: fixed;
+  z-index: 100;
+  width: 32px;
+  height: 32px;
+  pointer-events: none;
+  object-fit: contain;
+  transform: translate(0, -100%);
+  filter: drop-shadow(0 1px 1px rgb(0 0 0 / 45%));
+}
+
+.tool-cursor-plant {
+  position: fixed;
+  z-index: 99;
+  width: 60px;
+  height: 60px;
+  pointer-events: none;
+  object-fit: contain;
+  transform: translate(0, -100%);
+  filter: drop-shadow(0 1px 1px rgb(0 0 0 / 35%));
+}
+
+.tool-cursor-glove {
+  transform: translate(0, -100%) rotate(-12deg);
+}
+
+.plant-idle {
+  animation: plant-idle 3.2s ease-in-out infinite;
+  transform-origin: 50% 100%;
+}
+
+@keyframes plant-idle {
+
+  0%,
+  100% {
+    transform: rotate(0deg) scaleX(1);
+  }
+
+  35% {
+    transform: rotate(-4deg) scaleX(0.95);
+  }
+
+  70% {
+    transform: rotate(4deg) scaleX(1.05);
+  }
 }
 
 .wave-progress {
@@ -218,6 +294,245 @@ body {
 
 .pause-menu button:hover {
   background: #83b95e;
+}
+
+.reward-drop {
+  position: absolute;
+  z-index: 30;
+  display: grid;
+  place-items: center;
+  border: 0;
+  cursor: pointer;
+  transform: translate(-50%, -50%);
+}
+
+.reward-card {
+  display: grid;
+  min-width: 6.25rem;
+  place-items: center;
+  padding: 0.45rem 0.65rem 0.35rem;
+  border: 3px solid #d9a441;
+  border-radius: 0.7rem;
+  background: linear-gradient(145deg, #fff6c7, #c98736);
+  box-shadow: 0 0.35rem 0 #633817, 0 0 1.2rem #ffe58a;
+}
+
+.reward-art {
+  width: 4.7rem;
+  height: 4.7rem;
+  object-fit: contain;
+  filter: drop-shadow(0 0.25rem 0.15rem rgb(71 35 13 / 45%));
+}
+
+.reward-card strong {
+  color: #fff8c7;
+  font-size: 1.1rem;
+  text-shadow: 1px 2px #633817;
+}
+
+.reward-ground .reward-card {
+  animation: reward-bob 900ms ease-in-out infinite alternate;
+}
+
+.reward-unlocking {
+  position: fixed;
+  inset: 50% auto auto 50%;
+  z-index: 61;
+  animation: reward-grow 3800ms cubic-bezier(0.2, 0.7, 0.2, 1) forwards;
+}
+
+.reward-unlocking .reward-card {
+  min-width: 10rem;
+  padding: 1rem;
+  border-width: 5px;
+}
+
+.reward-unlocking .reward-art {
+  width: min(58vw, 30rem);
+  height: min(58vw, 30rem);
+}
+
+.reward-coins .reward-card {
+  animation: reward-bag-shrink 1500ms ease-in forwards;
+}
+
+.reward-coin-burst {
+  position: absolute;
+  top: 36%;
+  left: 50%;
+  width: 1px;
+  height: 1px;
+  pointer-events: none;
+}
+
+.reward-coin {
+  position: absolute;
+  width: 2rem;
+  height: 2rem;
+  object-fit: contain;
+  animation: reward-coin-explode 1200ms cubic-bezier(0.15, 0.75, 0.25, 1) forwards;
+}
+
+.reward-coin:nth-child(1) {
+  --coin-x: -5rem;
+  --coin-y: -3rem;
+}
+
+.reward-coin:nth-child(2) {
+  --coin-x: -2rem;
+  --coin-y: -5rem;
+}
+
+.reward-coin:nth-child(3) {
+  --coin-x: 2rem;
+  --coin-y: -5rem;
+}
+
+.reward-coin:nth-child(4) {
+  --coin-x: 5rem;
+  --coin-y: -2rem;
+}
+
+.reward-coin:nth-child(5) {
+  --coin-x: 5rem;
+  --coin-y: 3rem;
+}
+
+.reward-coin:nth-child(6) {
+  --coin-x: 1rem;
+  --coin-y: 5rem;
+}
+
+.reward-coin:nth-child(7) {
+  --coin-x: -3rem;
+  --coin-y: 5rem;
+}
+
+.reward-coin:nth-child(8) {
+  --coin-x: -5rem;
+  --coin-y: 2rem;
+}
+
+.reward-white-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  background: white;
+  pointer-events: none;
+}
+
+.reward-overlay-unlocking {
+  animation: reward-white-in 3800ms ease-in forwards;
+}
+
+.reward-overlay-transition {
+  animation: reward-white-flash 1000ms ease-out forwards;
+}
+
+.reward-overlay-empty {
+  animation: reward-white-empty 1600ms ease-in-out forwards;
+}
+
+@keyframes reward-bob {
+  from {
+    transform: translateY(0);
+  }
+
+  to {
+    transform: translateY(-0.55rem);
+  }
+}
+
+@keyframes reward-grow {
+  0% {
+    transform: translate(-50%, -50%) scale(1);
+  }
+
+  82% {
+    transform: translate(-50%, -50%) scale(6);
+  }
+
+  100% {
+    transform: translate(-50%, -50%) scale(5.5);
+    opacity: 0;
+  }
+}
+
+@keyframes reward-bag-shrink {
+  to {
+    transform: scale(0.1);
+    opacity: 0;
+  }
+}
+
+@keyframes reward-coin-explode {
+  0% {
+    transform: translate(-50%, -50%) scale(0.2) rotate(0);
+    opacity: 0;
+  }
+
+  20% {
+    opacity: 1;
+  }
+
+  100% {
+    transform: translate(calc(-50% + var(--coin-x)), calc(-50% + var(--coin-y))) scale(1) rotate(360deg);
+    opacity: 0;
+  }
+}
+
+@keyframes reward-white-in {
+
+  0%,
+  65% {
+    opacity: 0;
+  }
+
+  100% {
+    opacity: 1;
+  }
+}
+
+@keyframes reward-white-out {
+  from {
+    opacity: 1;
+  }
+
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes reward-white-flash {
+  0% {
+    opacity: 0;
+  }
+
+  18% {
+    opacity: 1;
+  }
+
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes reward-white-empty {
+  0% {
+    opacity: 0;
+  }
+
+  44% {
+    opacity: 1;
+  }
+
+  56% {
+    opacity: 1;
+  }
+
+  100% {
+    opacity: 0;
+  }
 }
 
 @media (max-width: 640px) {
@@ -644,11 +959,11 @@ body {
   color: #fff;
 }
 
-.credits-mode > div {
+.credits-mode>div {
   max-width: none;
 }
 
-.credits-mode > div > h1 {
+.credits-mode>div>h1 {
   display: none;
 }
 

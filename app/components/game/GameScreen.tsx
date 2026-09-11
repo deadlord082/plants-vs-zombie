@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type PointerEvent } from "react";
 import {
   INITIAL_SUN,
   PLANT_SPECS,
@@ -98,8 +98,23 @@ const DEFAULT_PLAYER_DATA: PlayerData = {
   completedLevels: [],
   seedBankSize: INITIAL_SEED_BANK_SIZE,
   seedSlotsPurchased: 0,
+  gloveUnlocked: false,
 };
 type AlmanacCategory = "plants" | "zombies" | "tiles";
+type RewardAnimation = "ground" | "unlocking" | "coins" | "transition";
+
+interface RewardDrop {
+  kind: "plant" | "money" | "glove";
+  plantKey?: PlantTypeKey;
+  value?: number;
+  x: number;
+  y: number;
+}
+
+interface ToolCursorPosition {
+  x: number;
+  y: number;
+}
 
 const LEVEL_CATEGORIES: Array<{ key: LevelCategory; name: string; description: string }> = [
   { key: "day", name: "Day", description: "Bright lawns and the beginning of the adventure." },
@@ -116,6 +131,7 @@ interface PlayerData {
   completedLevels: number[];
   seedBankSize: number;
   seedSlotsPurchased: number;
+  gloveUnlocked: boolean;
 }
 
 const randomizeInterval = (interval: number): number => {
@@ -130,6 +146,10 @@ export default function GameScreen() {
   const [almanacCategory, setAlmanacCategory] = useState<AlmanacCategory>("plants");
   const [selectedLevelCategory, setSelectedLevelCategory] = useState<LevelCategory>("day");
   const [shovelSelected, setShovelSelected] = useState(false);
+  const [gloveSelected, setGloveSelected] = useState(false);
+  const [movingPlantId, setMovingPlantId] = useState<string | null>(null);
+  const [gloveReadyAt, setGloveReadyAt] = useState(0);
+  const [toolCursorPosition, setToolCursorPosition] = useState<ToolCursorPosition | null>(null);
   const [isPaused, setIsPaused] = useState(false);
   const [currentLevel, setCurrentLevel] = useState<LevelConfig | null>(null);
   const [sun, setSun] = useState(INITIAL_SUN);
@@ -151,12 +171,14 @@ export default function GameScreen() {
     cherryBomb: 0,
   });
   const [gameTime, setGameTime] = useState(Date.now());
-  const [levelComplete, setLevelComplete] = useState(false);
   const [gameOver, setGameOver] = useState(false);
   const [showDebugHealth, setShowDebugHealth] = useState(false);
   const [playerData, setPlayerData] = useState<PlayerData>(DEFAULT_PLAYER_DATA);
   const [playerDataLoaded, setPlayerDataLoaded] = useState(false);
-  const [rewardMessage, setRewardMessage] = useState("");
+  const [rewardDrop, setRewardDrop] = useState<RewardDrop | null>(null);
+  const [rewardAnimation, setRewardAnimation] = useState<RewardAnimation>("ground");
+  const [rewardlessTransition, setRewardlessTransition] = useState(false);
+  const [rewardlessReady, setRewardlessReady] = useState(false);
 
   const plantsRef = useRef<PlantInstance[]>([]);
   const zombiesRef = useRef<ZombieInstance[]>([]);
@@ -192,6 +214,7 @@ export default function GameScreen() {
   const completionHandledRef = useRef(false);
   const defeatedZombieIdsRef = useRef(new Set<string>());
   const regularBatchHealthRef = useRef<{ zombieIds: Set<string>; initialHealth: number } | null>(null);
+  const suppressNextTileClickRef = useRef(false);
 
   useEffect(() => {
     try {
@@ -215,6 +238,7 @@ export default function GameScreen() {
             : [],
           seedBankSize: INITIAL_SEED_BANK_SIZE + Math.min(2, Math.max(0, Number.isInteger(storedSeedSlotsPurchased) ? storedSeedSlotsPurchased : 0)),
           seedSlotsPurchased: Math.min(2, Math.max(0, Number.isInteger(storedSeedSlotsPurchased) ? storedSeedSlotsPurchased : 0)),
+          gloveUnlocked: parsed.gloveUnlocked === true,
         };
         playerDataRef.current = loadedData;
         setPlayerData(loadedData);
@@ -285,9 +309,16 @@ export default function GameScreen() {
     waveActiveRef.current = false;
     setPlantReadyState({ sunflower: 0, peaShooter: 0, wallNut: 0, chomper: 0, cherryBomb: 0 });
     setShovelSelected(false);
+    setGloveSelected(false);
+    setMovingPlantId(null);
+    setGloveReadyAt(0);
+    setToolCursorPosition(null);
+    suppressNextTileClickRef.current = false;
     setIsPaused(false);
-    setLevelComplete(false);
-    setRewardMessage("");
+    setRewardDrop(null);
+    setRewardAnimation("ground");
+    setRewardlessTransition(false);
+    setRewardlessReady(false);
     setGameOver(false);
     gameOverRef.current = false;
     completionHandledRef.current = false;
@@ -343,20 +374,55 @@ export default function GameScreen() {
     });
   };
 
+  const selectShovel = () => {
+    setShovelSelected((selected) => !selected);
+    setGloveSelected(false);
+    setMovingPlantId(null);
+    setToolCursorPosition(null);
+  };
+
+  const selectGlove = () => {
+    if (gloveReadyAt > gameTime) return;
+    setGloveSelected((selected) => !selected);
+    setShovelSelected(false);
+    setMovingPlantId(null);
+    setToolCursorPosition(null);
+  };
+
   const returnToMenu = () => {
     setPhase("menu");
-    setLevelComplete(false);
+    setRewardDrop(null);
+    setRewardAnimation("ground");
+    setRewardlessTransition(false);
+    setRewardlessReady(false);
     setCurrentLevel(null);
     currentLevelRef.current = null;
     setGameOver(false);
     gameOverRef.current = false;
   };
 
-  const finishLevel = () => {
+  const returnToLevelSelect = () => {
+    setPhase("level-select");
+    setRewardDrop(null);
+    setRewardAnimation("ground");
+    setRewardlessTransition(false);
+    setRewardlessReady(false);
+    setCurrentLevel(null);
+    currentLevelRef.current = null;
+    setGameOver(false);
+    gameOverRef.current = false;
+  };
+
+  const finishLevel = (lastDefeatedZombie: ZombieInstance | null) => {
     if (!currentLevelRef.current || completionHandledRef.current) return;
     completionHandledRef.current = true;
     const levelId = currentLevelRef.current.id;
     const alreadyCompleted = playerDataRef.current.completedLevels.includes(levelId);
+    if (alreadyCompleted) {
+      setPhase("complete");
+      setRewardlessReady(true);
+      return;
+    }
     if (!alreadyCompleted) {
       const reward = currentLevelRef.current.reward;
       const moneyReward = reward?.money || 0;
@@ -366,19 +432,75 @@ export default function GameScreen() {
         money: playerDataRef.current.money + moneyReward,
         unlockedPlants: Array.from(new Set([...playerDataRef.current.unlockedPlants, ...unlockedPlants])),
         completedLevels: [...playerDataRef.current.completedLevels, levelId],
+        gloveUnlocked: playerDataRef.current.gloveUnlocked || reward?.glove === true,
       };
       playerDataRef.current = nextData;
       setPlayerData(nextData);
-      const rewardMessages = [
-        moneyReward > 0 ? `Reward: $${moneyReward}` : "",
-        ...unlockedPlants.map((plantKey) => `${PLANT_SPECS[plantKey].name} unlocked!`),
-      ].filter(Boolean);
-      setRewardMessage(rewardMessages.join(" ") || "Level completed!");
-    } else {
-      setRewardMessage("This level has already been completed.");
+      if (lastDefeatedZombie && reward) {
+        const rewardPlant = unlockedPlants[0];
+        setRewardDrop(rewardPlant
+          ? { kind: "plant", plantKey: rewardPlant, x: lastDefeatedZombie.x, y: lastDefeatedZombie.row + 0.35 }
+          : reward.glove
+            ? { kind: "glove", x: lastDefeatedZombie.x, y: lastDefeatedZombie.row + 0.35 }
+            : moneyReward > 0
+              ? { kind: "money", value: moneyReward, x: lastDefeatedZombie.x, y: lastDefeatedZombie.row + 0.35 }
+              : null);
+      }
     }
     setPhase("complete");
-    setLevelComplete(true);
+    const hasReward = Boolean(currentLevelRef.current.reward?.money
+      || currentLevelRef.current.reward?.glove
+      || currentLevelRef.current.reward?.unlockPlants?.length);
+    if (!hasReward) {
+      setRewardlessReady(true);
+    }
+  };
+
+  const startRewardlessTransition = () => {
+    if (!rewardlessReady || rewardlessTransition) return;
+    setRewardlessReady(false);
+    setRewardlessTransition(true);
+    window.setTimeout(() => {
+      setPhase("level-select");
+      setCurrentLevel(null);
+      currentLevelRef.current = null;
+    }, 700);
+    window.setTimeout(() => {
+      setRewardlessTransition(false);
+    }, 1600);
+  };
+
+  const collectReward = () => {
+    if (!rewardDrop || rewardAnimation !== "ground") return;
+    if (rewardDrop.kind === "money") {
+      setRewardAnimation("coins");
+      window.setTimeout(() => {
+        setRewardAnimation("transition");
+        setPhase("level-select");
+        setCurrentLevel(null);
+        currentLevelRef.current = null;
+        setGameOver(false);
+        gameOverRef.current = false;
+        window.setTimeout(() => {
+          setRewardDrop(null);
+          setRewardAnimation("ground");
+        }, 1000);
+      }, 1500);
+      return;
+    }
+    setRewardAnimation("unlocking");
+    window.setTimeout(() => {
+      setRewardAnimation("transition");
+      setPhase("level-select");
+      setCurrentLevel(null);
+      currentLevelRef.current = null;
+      setGameOver(false);
+      gameOverRef.current = false;
+      window.setTimeout(() => {
+        setRewardDrop(null);
+        setRewardAnimation("ground");
+      }, 1000);
+    }, 3800);
   };
 
   const buySeedSlot = () => {
@@ -405,6 +527,7 @@ export default function GameScreen() {
       }
       return;
     }
+    if (gloveSelected) return;
     const tile = currentLevelRef.current?.tiles[row]?.[col] || "normal";
     if (!getTileDefinition(tile).canPlant) return;
     const now = Date.now();
@@ -434,6 +557,40 @@ export default function GameScreen() {
       ...plantReadyRef.current,
       [selectedPlant]: now + spec.rechargeMs,
     });
+  };
+
+  const handleGlovePointerDown = (row: number, col: number) => {
+    if (!gloveSelected || gloveReadyAt > Date.now()) return;
+    const plant = plantsRef.current.find((item) => item.row === row && item.col === col);
+    if (plant) setMovingPlantId(plant.id);
+  };
+
+  const handleGlovePointerUp = (row: number, col: number) => {
+    if (!gloveSelected || !movingPlantId || gloveReadyAt > Date.now()) return;
+    const destinationPlant = plantsRef.current.find((plant) => plant.row === row && plant.col === col);
+    const movingPlant = plantsRef.current.find((plant) => plant.id === movingPlantId);
+    const tile = currentLevelRef.current?.tiles[row]?.[col] || "normal";
+    if (!movingPlant || destinationPlant || !getTileDefinition(tile).canPlant) {
+      setMovingPlantId(null);
+      return;
+    }
+    const now = Date.now();
+    setPlantsState(plantsRef.current.map((plant) => plant.id === movingPlantId ? { ...plant, row, col, lastContactAt: now } : plant));
+    setMovingPlantId(null);
+    setGloveSelected(false);
+    setGloveReadyAt(now + (currentLevelRef.current?.gloveRechargeMs || 0));
+    suppressNextTileClickRef.current = true;
+  };
+
+  const handleGloveBoardPointerUp = (event: PointerEvent<HTMLDivElement>) => {
+    if (!gloveSelected || !movingPlantId) return;
+    event.preventDefault();
+    const tile = document.elementFromPoint(event.clientX, event.clientY)?.closest<HTMLElement>("[data-lawn-row]");
+    if (!tile) {
+      setMovingPlantId(null);
+      return;
+    }
+    handleGlovePointerUp(Number(tile.dataset.lawnRow), Number(tile.dataset.lawnCol));
   };
 
   const collectSun = (sunId: string) => {
@@ -853,9 +1010,11 @@ export default function GameScreen() {
       return { ...zombie, x: newX, contactStartedAt: undefined };
     });
 
+    let lastDefeatedZombie: ZombieInstance | null = null;
     nextZombies.forEach((zombie) => {
       if (zombie.hp > 0 || defeatedZombieIdsRef.current.has(zombie.id)) return;
       defeatedZombieIdsRef.current.add(zombie.id);
+      lastDefeatedZombie = zombie;
       const dropChance = ZOMBIE_SPECS[zombie.type]?.coinDropChance || 0;
       if (Math.random() >= dropChance) return;
       const isGold = Math.random() < 0.2;
@@ -899,7 +1058,7 @@ export default function GameScreen() {
       nextZombies.length === 0 &&
       !waveActiveRef.current
     ) {
-      finishLevel();
+      finishLevel(lastDefeatedZombie);
     }
   }, [gameTime, phase, currentLevel, isPaused]);
 
@@ -936,11 +1095,11 @@ export default function GameScreen() {
             ? "Shop"
             : phase === "almanac"
               ? "Almanac"
-                : phase === "credits"
-                  ? "Credits"
-              : currentLevel
-                ? currentLevel.title
-                : "Level";
+              : phase === "credits"
+                ? "Credits"
+                : currentLevel
+                  ? currentLevel.title
+                  : "Level";
   const waveStageLabel = (() => {
     if (!currentLevel) return "";
     const nextWave = compiledCurrentLevel?.spawnWaves[spawnScheduleRef.current.batchIndex];
@@ -956,6 +1115,7 @@ export default function GameScreen() {
       ]),
     )
     : [];
+  const movingPlant = movingPlantId ? plants.find((plant) => plant.id === movingPlantId) : null;
 
   return (
     <div className={`min-h-screen bg-slate-950 text-slate-100 px-4 py-8 sm:px-8 ${phase === "credits" ? "credits-mode" : ""}`}>
@@ -1127,7 +1287,7 @@ export default function GameScreen() {
                   const disabled = !ready || !enoughSun;
                   const coolDown = Math.max(0, Math.ceil((plantReadyRef.current[spec.key] - gameTime) / 1000));
                   return (
-                    <button key={spec.key} type="button" aria-label={`${spec.name}, costs ${spec.cost} sun`} onClick={() => { setSelectedPlant(spec.key); setShovelSelected(false); }} className={`seed-slot ${selectedPlant === spec.key && !shovelSelected ? "selected" : ""} ${disabled ? "unavailable" : ""}`}>
+                    <button key={spec.key} type="button" aria-label={`${spec.name}, costs ${spec.cost} sun`} onClick={() => { setSelectedPlant(spec.key); setShovelSelected(false); setGloveSelected(false); setMovingPlantId(null); }} className={`seed-slot ${selectedPlant === spec.key && !shovelSelected && !gloveSelected ? "selected" : ""} ${disabled ? "unavailable" : ""}`}>
                       <img src={getPlantImage(spec.key)} alt="" />
                       <span>{spec.cost}</span>
                       {!ready && <small>{coolDown}s</small>}
@@ -1136,12 +1296,20 @@ export default function GameScreen() {
                 })}
                 {Array.from({ length: Math.max(0, playerData.seedBankSize - selectedLoadout.length) }).map((_, index) => <div key={`empty-${index}`} className="seed-slot empty" aria-hidden="true" />)}
               </div>
-              <button type="button" aria-label="Select shovel" onClick={() => setShovelSelected((selected) => !selected)} className={`shovel-button ${shovelSelected ? "selected" : ""}`}><img src="/shovel.webp" alt="" /></button>
+              <button type="button" aria-label="Select shovel" onClick={selectShovel} className={`shovel-button ${shovelSelected ? "selected" : ""}`}><img src="/shovel.webp" alt="" /></button>
+              {playerData.gloveUnlocked && <button type="button" aria-label="Select glove" onClick={selectGlove} disabled={gloveReadyAt > gameTime} className={`shovel-button glove-button ${gloveSelected ? "selected" : ""} ${gloveReadyAt > gameTime ? "unavailable" : ""}`}><img src="/glove.webp" alt="" />{gloveReadyAt > gameTime && <small>{Math.ceil((gloveReadyAt - gameTime) / 1000)}s</small>}</button>}
               <button type="button" aria-label="Open pause menu" onClick={() => setIsPaused(true)} className="settings-button">⚙</button>
             </div>
 
             <div className="overflow-hidden rounded-3xl border border-slate-700 bg-slate-900/90 p-4 shadow-xl">
-              <div className="relative grid gap-1 bg-slate-950 p-1 sm:p-2" style={{ gridTemplateColumns: `repeat(${gridCols}, minmax(0, 1fr))` }}>
+              <div
+                className={`relative grid gap-1 bg-slate-950 p-1 sm:p-2 ${shovelSelected ? "shovel-cursor" : gloveSelected ? "glove-cursor" : ""}`}
+                onPointerMove={(event) => setToolCursorPosition({ x: event.clientX, y: event.clientY })}
+                onPointerUp={handleGloveBoardPointerUp}
+                onPointerLeave={() => setToolCursorPosition(null)}
+                onClick={startRewardlessTransition}
+                style={{ gridTemplateColumns: `repeat(${gridCols}, minmax(0, 1fr))` }}
+              >
                 {grid.flat().map(({ row, col }) => {
                   const plant = plants.find((item) => item.row === row && item.col === col);
                   const tile = getTileDefinition(currentLevel?.tiles[row]?.[col] || "normal");
@@ -1150,14 +1318,29 @@ export default function GameScreen() {
                     <button
                       key={tileKey(row, col)}
                       type="button"
-                      onClick={() => handlePlacePlant(row, col)}
+                      onClick={(event) => {
+                        if (gloveSelected || suppressNextTileClickRef.current) {
+                          event.preventDefault();
+                          suppressNextTileClickRef.current = false;
+                          return;
+                        }
+                        handlePlacePlant(row, col);
+                      }}
+                      onPointerDown={(event) => {
+                        if (gloveSelected) {
+                          event.preventDefault();
+                          handleGlovePointerDown(row, col);
+                        }
+                      }}
+                      data-lawn-row={row}
+                      data-lawn-col={col}
                       disabled={!tile.canPlant}
                       aria-label={tile.label || "Available lawn tile"}
                       className={`relative z-0 min-h-16 overflow-visible p-2 text-left transition ${tile.className}`}
                     >
                       {tile.label && !plant && <span className="text-xs font-semibold uppercase tracking-wide text-stone-200">{tile.label}</span>}
                       {plant && (
-                        <div className="relative z-10 h-full w-full text-xs text-lime-200">
+                        <div className="plant-idle relative z-10 h-full w-full text-xs text-lime-200">
                           {(() => {
                             const wallNutImage = plant.type === "wallNut"
                               ? plant.hp <= 1000 ? "/wall-nut-heavely-damaged.webp" : plant.hp <= 2500 ? "/wall-nut-damaged.webp" : "/wall-nut.webp"
@@ -1240,6 +1423,37 @@ export default function GameScreen() {
                   </button>
                 ))}
 
+                {rewardDrop && (
+                  <button
+                    type="button"
+                    aria-label={rewardDrop.kind === "money" ? `Collect $${rewardDrop.value}` : "Collect level reward"}
+                    onClick={collectReward}
+                    className={`reward-drop reward-${rewardDrop.kind} reward-${rewardAnimation}`}
+                    style={{
+                      left: `${(rewardDrop.x / gridCols) * 100}%`,
+                      top: `${(rewardDrop.y / gridRows) * 100}%`,
+                    }}
+                  >
+                    <span className="reward-card">
+                      <img
+                        src={rewardDrop.kind === "money"
+                          ? "/money-bag.webp"
+                          : rewardDrop.kind === "glove"
+                            ? "/glove.webp"
+                            : getPlantImage(rewardDrop.plantKey || "peaShooter")}
+                        alt=""
+                        className="reward-art"
+                      />
+                      {rewardDrop.kind === "money" && <strong>${rewardDrop.value}</strong>}
+                    </span>
+                    {rewardDrop.kind === "money" && rewardAnimation === "coins" && (
+                      <span className="reward-coin-burst" aria-hidden="true">
+                        {Array.from({ length: 8 }).map((_, index) => <img key={index} src="/gold-coin.webp" alt="" className="reward-coin" />)}
+                      </span>
+                    )}
+                  </button>
+                )}
+
                 {/* Zombie overlay: render zombies absolutely so they can move smoothly (fractional x) */}
                 {zombies.map((z) => {
                   const armorImage = getZombieArmorImage(z.type, z.armor, z.armorBrokenAt, gameTime);
@@ -1309,21 +1523,28 @@ export default function GameScreen() {
         </div>
       )}
 
-      {levelComplete && phase !== "menu" && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/90 px-4 py-8">
-          <div className="w-full max-w-xl rounded-3xl border border-lime-400 bg-slate-900/95 p-8 text-center shadow-2xl">
-            <h2 className="text-3xl font-semibold text-white">Level Complete!</h2>
-            <p className="mt-4 text-slate-300">All zombies have been defeated. Great job on your first level.</p>
-            <p className="mt-3 text-xl font-semibold text-amber-200">{rewardMessage}</p>
-            <button
-              type="button"
-              onClick={returnToMenu}
-              className="mt-8 inline-flex rounded-full bg-lime-500 px-6 py-3 text-lg font-semibold text-slate-950 transition hover:bg-lime-400"
-            >
-              Return to main menu
-            </button>
-          </div>
-        </div>
+      {(rewardlessTransition || (rewardDrop && (rewardAnimation === "unlocking" || rewardAnimation === "transition"))) && (
+        <div className={`reward-white-overlay reward-overlay-${rewardlessTransition ? "empty" : rewardAnimation}`} aria-hidden="true" />
+      )}
+      {toolCursorPosition && (shovelSelected || gloveSelected) && (
+        <>
+          {gloveSelected && movingPlant && (
+            <img
+              src={getPlantImage(movingPlant.type)}
+              alt=""
+              aria-hidden="true"
+              className="tool-cursor-plant"
+              style={{ left: toolCursorPosition.x, top: toolCursorPosition.y }}
+            />
+          )}
+          <img
+            src={shovelSelected ? "/shovel.webp" : "/glove.webp"}
+            alt=""
+            aria-hidden="true"
+            className={`tool-cursor-image ${gloveSelected ? "tool-cursor-glove" : "tool-cursor-shovel"}`}
+            style={{ left: toolCursorPosition.x, top: toolCursorPosition.y }}
+          />
+        </>
       )}
 
       {gameOver && (

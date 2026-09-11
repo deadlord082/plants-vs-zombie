@@ -26,6 +26,7 @@ export interface LevelDefinition {
   betweenWaveDelayMs: number;
   waveSpawnIntervalMs: number;
   skySunIntervalMs?: number;
+  gloveRechargeMs?: number;
   reward?: LevelReward;
   tiles: TileType[][];
   // Each wave spawns together unless it is marked as a boss wave.
@@ -46,6 +47,7 @@ export interface CompiledLevelConfig {
   betweenWaveDelayMs: number;
   waveSpawnIntervalMs: number;
   skySunIntervalMs?: number;
+  gloveRechargeMs: number;
   reward?: LevelReward;
   tiles: TileType[][];
   // Total pre-wave zombies

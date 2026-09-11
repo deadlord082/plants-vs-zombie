@@ -69,6 +69,7 @@ export function compileLevelDefinition(def: LevelDefinition): CompiledLevelConfi
     betweenWaveDelayMs: def.betweenWaveDelayMs,
     waveSpawnIntervalMs: def.waveSpawnIntervalMs,
     skySunIntervalMs: def.skySunIntervalMs,
+    gloveRechargeMs: def.gloveRechargeMs ?? 10000,
     reward: def.reward,
     tiles: def.tiles,
     preWaveCount,
@@ -102,6 +103,7 @@ export function toLevelConfig(compiled: CompiledLevelConfig): LevelConfig {
     betweenWaveDelayMs: compiled.betweenWaveDelayMs,
     waveSpawnIntervalMs: compiled.waveSpawnIntervalMs,
     skySunIntervalMs: compiled.skySunIntervalMs,
+    gloveRechargeMs: compiled.gloveRechargeMs,
     reward: compiled.reward,
     tiles: compiled.tiles,
   };

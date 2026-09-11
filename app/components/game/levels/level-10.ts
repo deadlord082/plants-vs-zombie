@@ -10,7 +10,7 @@ export const LEVEL_10: LevelDefinition = {
     betweenWaveDelayMs: 3000,
     waveSpawnIntervalMs: 1400,
     skySunIntervalMs: 10000,
-    reward: { money: 200 },
+    reward: { glove: true },
     tiles: [
         ["normal", "normalDark", "normal", "normalDark", "normal", "normalDark", "normal", "normalDark"],
         ["normalDark", "normal", "normalDark", "normal", "normalDark", "normal", "normalDark", "normal"],

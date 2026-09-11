@@ -6,6 +6,7 @@ import type { TileType } from "./tiles";
 export interface LevelReward {
   money?: number;
   unlockPlants?: PlantTypeKey[];
+  glove?: boolean;
 }
 
 export interface LevelConfig {
@@ -23,6 +24,7 @@ export interface LevelConfig {
   betweenWaveDelayMs: number;
   waveSpawnIntervalMs: number;
   skySunIntervalMs?: number;
+  gloveRechargeMs: number;
   reward?: LevelReward;
   tiles: TileType[][];
 }
