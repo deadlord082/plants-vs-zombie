@@ -1,4 +1,4 @@
-import type { PlantSpec, PlantTypeKey } from "./types";
+import type { BasePlantTypeKey, PlantSpec, PlantTypeKey } from "./types";
 
 export const INITIAL_SUN = 50;
 export const ZOMBIE_HP = 200;
@@ -20,6 +20,8 @@ export const CHOMPER_SLEEP_MS = 10000;
 export const CHERRY_BOMB_FUSE_MS = 2000;
 export const PROJECTILE_SPEED_PER_TICK = 0.8;
 export const GAME_TICK_MS = 200;
+
+export const BASE_PLANT_TYPES: BasePlantTypeKey[] = ["sunflower", "peaShooter", "wallNut", "chomper", "cherryBomb"];
 
 export const PLANT_SPECS: Record<PlantTypeKey, PlantSpec> = {
   sunflower: {
@@ -70,6 +72,123 @@ export const PLANT_SPECS: Record<PlantTypeKey, PlantSpec> = {
     summary: "Explodes after 2 seconds, dealing 1,000 damage to every zombie in a 3x3 area.",
     damage: 1000,
   },
+  peanut: {
+    key: "peanut",
+    name: "Peanut",
+    hp: 4000,
+    cost: 0,
+    rechargeMs: 0,
+    summary: "A Wall-nut fused with a Pea Shooter. It fires piercing nut projectiles for 20 damage.",
+    damage: 20,
+    shootMs: PEASHOOTER_SHOOT_MS,
+    projectileImage: "/plants/peanut-projectile.png",
+    fusionOf: ["peaShooter", "wallNut"],
+    pierces: true,
+  },
+  sunNut: {
+    key: "sunNut",
+    name: "Sun-nut",
+    hp: 4000,
+    cost: 0,
+    rechargeMs: 0,
+    generateAmount: 50,
+    generateMs: SUNFLOWER_GENERATION_MS,
+    firstBurstMs: SUNFLOWER_FIRST_BURST_MS,
+    summary: "A Wall-nut fused with a Sunflower. It generates sun like a Sunflower.",
+    fusionOf: ["sunflower", "wallNut"],
+  },
+  tallNut: {
+    key: "tallNut",
+    name: "Tall-nut",
+    hp: 8000,
+    cost: 0,
+    rechargeMs: 0,
+    summary: "Two Wall-nuts fused together, creating a barrier with 8,000 HP.",
+    fusionOf: ["wallNut", "wallNut"],
+  },
+  chompNut: {
+    key: "chompNut",
+    name: "Chomp-nut",
+    hp: 4000,
+    cost: 0,
+    rechargeMs: 0,
+    damage: 40,
+    shootMs: PEASHOOTER_SHOOT_MS,
+    summary: "A Wall-nut fused with a Chomper. It eats weak zombies and restores 200 HP each time it eats.",
+    fusionOf: ["chomper", "wallNut"],
+    regeneration: 200,
+  },
+  explodeONut: {
+    key: "explodeONut",
+    name: "Explode-o-nut",
+    hp: 4000,
+    cost: 0,
+    rechargeMs: 0,
+    summary: "A Wall-nut fused with a Cherry Bomb. Each damage stage change triggers a Cherry Bomb blast.",
+    fusionOf: ["cherryBomb", "wallNut"],
+    explosionOnDamageStage: true,
+  },
+  twinSunflower: {
+    key: "twinSunflower", name: "Twin Sunflower", hp: 300, cost: 0, rechargeMs: 0,
+    summary: "A Sunflower fused with another Sunflower. It produces 50 and 75 sun every 30 seconds.",
+    generateAmount: 50, generateMs: SUNFLOWER_GENERATION_MS, firstBurstMs: SUNFLOWER_FIRST_BURST_MS,
+    fusionOf: ["sunflower", "sunflower"],
+  },
+  sunBomb: {
+    key: "sunBomb", name: "Sun Bomb", hp: 1, cost: 0, rechargeMs: 0,
+    summary: "A Sunflower fused with a Cherry Bomb. Zombies killed by its blast become 25 sun.",
+    damage: 1000, fusionOf: ["sunflower", "cherryBomb"],
+  },
+  sunChomper: {
+    key: "sunChomper", name: "Sun Chomper", hp: 300, cost: 0, rechargeMs: 0,
+    summary: "A Sunflower fused with a Chomper. It produces 50 sun after eating a zombie.",
+    damage: 40, shootMs: PEASHOOTER_SHOOT_MS, bonusSunOnEat: 50, fusionOf: ["sunflower", "chomper"],
+  },
+  sunshooter: {
+    key: "sunshooter", name: "Sunshooter", hp: 300, cost: 0, rechargeMs: 0,
+    summary: "A Sunflower fused with a Pea Shooter. It produces sun and fires peas.",
+    damage: 20, shootMs: PEASHOOTER_SHOOT_MS, generateAmount: 50, generateMs: SUNFLOWER_GENERATION_MS,
+    firstBurstMs: SUNFLOWER_FIRST_BURST_MS, fusionOf: ["sunflower", "peaShooter"],
+  },
+  repeater: {
+    key: "repeater", name: "Repeater", hp: 300, cost: 0, rechargeMs: 0,
+    summary: "A Pea Shooter fused with another Pea Shooter. It fires two peas 100ms apart 20% faster.",
+    damage: 20, shootMs: PEASHOOTER_SHOOT_MS, shotsPerBurst: 2, shotDelayMs: 100, fireRateMultiplier: 0.8,
+    fusionOf: ["peaShooter", "peaShooter"],
+  },
+  chompShooter: {
+    key: "chompShooter", name: "Chomp-shooter", hp: 300, cost: 0, rechargeMs: 0,
+    summary: "A Chomper fused with a Pea Shooter. After eating, it fires three 80-damage projectiles before eating again.",
+    damage: 40, shootMs: PEASHOOTER_SHOOT_MS, eatProjectileCount: 3, eatProjectileDamage: 80,
+    eatProjectileImage: "/plants/chomp-shooter-projectile.webp", fusionOf: ["peaShooter", "chomper"],
+  },
+  cherryBomber: {
+    key: "cherryBomber", name: "Cherry Bomber", hp: 300, cost: 0, rechargeMs: 0,
+    summary: "A Pea Shooter fused with a Cherry Bomb. It fires Cherry Bomber projectiles that blast for 20 damage.",
+    damage: 20, shootMs: PEASHOOTER_SHOOT_MS, projectileImage: "/plants/cherry-bomber-projectile.webp",
+    projectileBlastDamage: 20, projectileBlastRadius: 1, fusionOf: ["peaShooter", "cherryBomb"],
+  },
+  cherryChomper: {
+    key: "cherryChomper", name: "Cherry Chomper", hp: 300, cost: 0, rechargeMs: 0,
+    summary: "A Chomper fused with a Cherry Bomb. Every zombie it eats triggers a 200-damage blast.",
+    damage: 40, shootMs: PEASHOOTER_SHOOT_MS, eatExplosionDamage: 200, fusionOf: ["cherryBomb", "chomper"],
+  },
+};
+
+export const FUSION_RECIPES: Record<string, PlantTypeKey> = {
+  "peaShooter+wallNut": "peanut",
+  "sunflower+wallNut": "sunNut",
+  "wallNut+wallNut": "tallNut",
+  "chomper+wallNut": "chompNut",
+  "cherryBomb+wallNut": "explodeONut",
+  "sunflower+sunflower": "twinSunflower",
+  "cherryBomb+sunflower": "sunBomb",
+  "chomper+sunflower": "sunChomper",
+  "peaShooter+sunflower": "sunshooter",
+  "peaShooter+peaShooter": "repeater",
+  "chomper+peaShooter": "chompShooter",
+  "cherryBomb+peaShooter": "cherryBomber",
+  "cherryBomb+chomper": "cherryChomper",
 };
 
 export interface ZombieSpec {

@@ -23,9 +23,12 @@ import {
   CHERRY_BOMB_FUSE_MS,
   CHOMPER_BITE_MS,
   CHOMPER_SLEEP_MS,
+  BASE_PLANT_TYPES,
+  FUSION_RECIPES,
 } from "./constants";
 import { getCompiledLevel } from "./levels";
 import type {
+  BasePlantTypeKey,
   GamePhase,
   LevelConfig,
   PlantInstance,
@@ -44,25 +47,77 @@ const createId = () => Math.random().toString(36).slice(2, 9);
 const tileKey = (row: number, col: number) => `${row}-${col}`;
 
 const getPlantImage = (plantType: PlantTypeKey) => ({
-  peaShooter: "/plant_peashooter.webp",
-  sunflower: "/sunflower.webp",
-  wallNut: "/wall-nut.webp",
-  chomper: "/chomper.webp",
-  cherryBomb: "/cherry-bomb.webp",
+  peaShooter: "/plants/plant_peashooter.webp",
+  sunflower: "/plants/sunflower.webp",
+  wallNut: "/plants/wall-nut.webp",
+  chomper: "/plants/chomper.webp",
+  cherryBomb: "/plants/cherry-bomb.webp",
+  peanut: "/plants/peanut.webp",
+  sunNut: "/plants/sun-nut.webp",
+  tallNut: "/plants/tall-nut.webp",
+  chompNut: "/plants/chomp-nut.webp",
+  explodeONut: "/plants/explode-o-nut_1.webp",
+  twinSunflower: "/plants/twin-sunflower.webp",
+  sunBomb: "/plants/sun-bomb.webp",
+  sunChomper: "/plants/sun-chomper.webp",
+  sunshooter: "/plants/sunshooter.webp",
+  repeater: "/plants/repeater.webp",
+  chompShooter: "/plants/chomp-shooter.webp",
+  cherryBomber: "/plants/cherry-bomber.webp",
+  cherryChomper: "/plants/cherry-chomper.webp",
 }[plantType]);
 
-const getZombieImage = (zombieType: string) => zombieType === "imp" ? "/imp.webp" : zombieType === "gargantuar" ? "/gargantuar.webp" : "/zombie.webp";
+const getNutDamageImage = (plantType: PlantTypeKey, stage: number) => {
+  if (stage === 0) return getPlantImage(plantType);
+  const damagedImages: Partial<Record<PlantTypeKey, [string, string]>> = {
+    wallNut: ["/plants/wall-nut-damaged.webp", "/plants/wall-nut-heavely-damaged.webp"],
+    peanut: ["/plants/peanut-damaged.webp", "/plants/peanut-heavely-damaged.webp"],
+    sunNut: ["/plants/sun-nut-damaged.webp", "/plants/sun-nut-heavenly-damaged.webp"],
+    tallNut: ["/plants/tall-nut-damaged.webp", "/plants/tall-nut-heavely-damaged.webp"],
+    explodeONut: ["/plants/explode-o-nut-damaged_1.webp", "/plants/explode-o-nut-heavely-damaged_1.webp"],
+  };
+  return damagedImages[plantType]?.[stage - 1] || getPlantImage(plantType);
+};
+
+const getFusionType = (first: PlantTypeKey, second: PlantTypeKey): PlantTypeKey | null => {
+  if (PLANT_SPECS[first].fusionOf || PLANT_SPECS[second].fusionOf) return null;
+  return FUSION_RECIPES[[first, second].sort().join("+")] || null;
+};
+
+const getPlantInstance = (type: PlantTypeKey, row: number, col: number, now: number): PlantInstance => {
+  const spec = PLANT_SPECS[type];
+  return {
+    id: createId(),
+    type,
+    row,
+    col,
+    hp: spec.hp,
+    plantedAt: now,
+    nextSunAt: spec.generateMs ? now + (spec.firstBurstMs || SUNFLOWER_FIRST_BURST_MS) : undefined,
+    nextShotAt: spec.shootMs ? now + (spec.shootMs || PEASHOOTER_SHOOT_MS) : undefined,
+    lastContactAt: now,
+    cherryBombExplodesAt: type === "cherryBomb" || type === "sunBomb" ? now + CHERRY_BOMB_FUSE_MS : undefined,
+    sunIntervalMs: spec.generateMs ? randomizeInterval(spec.generateMs) : undefined,
+    shootIntervalMs: spec.shootMs ? randomizeInterval(spec.shootMs) : undefined,
+    pendingShots: 0,
+    nextSunValue: type === "twinSunflower" ? 50 : undefined,
+  };
+};
+
+const getNutDamageStage = (hp: number) => hp <= 1000 ? 2 : hp <= 2500 ? 1 : 0;
+
+const getZombieImage = (zombieType: string) => zombieType === "imp" ? "/zombie/imp.webp" : zombieType === "gargantuar" ? "/zombie/gargantuar.webp" : "/zombie/zombie.webp";
 
 const getZombieArmorImage = (zombieType: string, armor: number, armorBrokenAt?: number, now = Date.now()) => {
   const armorSpec = zombieType === "cone"
-    ? { max: 360, stage: 120, damaged: "/cone-damaged.webp", heavilyDamaged: "/cone-heavely-damaged.webp" }
+    ? { max: 360, stage: 120, damaged: "/zombie/cone-damaged.webp", heavilyDamaged: "/zombie/cone-heavely-damaged.webp" }
     : zombieType === "bucket"
-      ? { max: 1000, stage: 350, damaged: "/bucket-damaged.webp", heavilyDamaged: "/bucket-heavely-damaged.webp" }
+      ? { max: 1000, stage: 350, damaged: "/zombie/bucket-damaged.webp", heavilyDamaged: "/zombie/bucket-heavely-damaged.webp" }
       : null;
   if (!armorSpec || (armor <= 0 && (!armorBrokenAt || now - armorBrokenAt >= 2000))) return null;
   if (armor <= armorSpec.stage || armorBrokenAt) return armorSpec.heavilyDamaged;
   if (armor <= armorSpec.max - armorSpec.stage) return armorSpec.damaged;
-  return zombieType === "cone" ? "/cone.webp" : "/bucket.webp";
+  return zombieType === "cone" ? "/zombie/cone.webp" : "/zombie/bucket.webp";
 };
 
 const getZombieLabel = (zombieType: string) => zombieType === "basic"
@@ -127,7 +182,7 @@ const LEVEL_CATEGORIES: Array<{ key: LevelCategory; name: string; description: s
 
 interface PlayerData {
   money: number;
-  unlockedPlants: PlantTypeKey[];
+  unlockedPlants: BasePlantTypeKey[];
   completedLevels: number[];
   seedBankSize: number;
   seedSlotsPurchased: number;
@@ -141,9 +196,10 @@ const randomizeInterval = (interval: number): number => {
 
 export default function GameScreen() {
   const [phase, setPhase] = useState<GamePhase>("menu");
-  const [selectedPlant, setSelectedPlant] = useState<PlantTypeKey>("peaShooter");
-  const [selectedLoadout, setSelectedLoadout] = useState<PlantTypeKey[]>([]);
+  const [selectedPlant, setSelectedPlant] = useState<BasePlantTypeKey>("peaShooter");
+  const [selectedLoadout, setSelectedLoadout] = useState<BasePlantTypeKey[]>([]);
   const [almanacCategory, setAlmanacCategory] = useState<AlmanacCategory>("plants");
+  const [almanacPlantKey, setAlmanacPlantKey] = useState<BasePlantTypeKey | null>(null);
   const [selectedLevelCategory, setSelectedLevelCategory] = useState<LevelCategory>("day");
   const [shovelSelected, setShovelSelected] = useState(false);
   const [gloveSelected, setGloveSelected] = useState(false);
@@ -163,7 +219,7 @@ export default function GameScreen() {
   const [wave2Spawned, setWave2Spawned] = useState(0);
   const [spawnedZombieCount, setSpawnedZombieCount] = useState(0);
   const [waveActive, setWaveActive] = useState(false);
-  const [plantReady, setPlantReady] = useState<Record<PlantTypeKey, number>>({
+  const [plantReady, setPlantReady] = useState<Record<BasePlantTypeKey, number>>({
     sunflower: 0,
     peaShooter: 0,
     wallNut: 0,
@@ -191,7 +247,7 @@ export default function GameScreen() {
   const wave2SpawnedRef = useRef(0);
   const spawnedZombieCountRef = useRef(0);
   const waveActiveRef = useRef(false);
-  const plantReadyRef = useRef<Record<PlantTypeKey, number>>({
+  const plantReadyRef = useRef<Record<BasePlantTypeKey, number>>({
     sunflower: 0,
     peaShooter: 0,
     wallNut: 0,
@@ -227,12 +283,12 @@ export default function GameScreen() {
           ? parsed.seedSlotsPurchased
           : storedSeedBankSize - INITIAL_SEED_BANK_SIZE;
         const unlockedPlants = Array.isArray(parsed.unlockedPlants)
-          ? parsed.unlockedPlants.filter((key): key is PlantTypeKey =>
+          ? parsed.unlockedPlants.filter((key): key is BasePlantTypeKey =>
             key === "peaShooter" || key === "sunflower" || key === "wallNut" || key === "chomper" || key === "cherryBomb")
           : DEFAULT_PLAYER_DATA.unlockedPlants;
         const loadedData: PlayerData = {
           money: Number.isInteger(storedMoney) && storedMoney >= 0 ? storedMoney : 0,
-          unlockedPlants: Array.from(new Set(["peaShooter", ...unlockedPlants])) as PlantTypeKey[],
+          unlockedPlants: Array.from(new Set(["peaShooter", ...unlockedPlants])) as BasePlantTypeKey[],
           completedLevels: Array.isArray(parsed.completedLevels)
             ? parsed.completedLevels.filter((levelId): levelId is number => Number.isInteger(levelId) && levelId >= 0)
             : [],
@@ -285,7 +341,7 @@ export default function GameScreen() {
     setSun(next);
   };
 
-  const setPlantReadyState = (next: Record<PlantTypeKey, number>) => {
+  const setPlantReadyState = (next: Record<BasePlantTypeKey, number>) => {
     plantReadyRef.current = next;
     setPlantReady(next);
   };
@@ -366,7 +422,7 @@ export default function GameScreen() {
     setPhase("playing");
   };
 
-  const toggleLoadoutPlant = (plantKey: PlantTypeKey) => {
+  const toggleLoadoutPlant = (plantKey: BasePlantTypeKey) => {
     setSelectedLoadout((current) => {
       if (current.includes(plantKey)) return current.filter((key) => key !== plantKey);
       if (current.length >= playerDataRef.current.seedBankSize) return current;
@@ -531,27 +587,16 @@ export default function GameScreen() {
     const tile = currentLevelRef.current?.tiles[row]?.[col] || "normal";
     if (!getTileDefinition(tile).canPlant) return;
     const now = Date.now();
-    if (existingPlant) return;
     const spec = PLANT_SPECS[selectedPlant];
     if (sunRef.current < spec.cost) return;
     if (plantReadyRef.current[selectedPlant] > now) return;
 
-    const newPlant: PlantInstance = {
-      id: createId(),
-      type: selectedPlant,
-      row,
-      col,
-      hp: spec.hp,
-      plantedAt: now,
-      nextSunAt: selectedPlant === "sunflower" ? now + SUNFLOWER_FIRST_BURST_MS : undefined,
-      nextShotAt: selectedPlant === "peaShooter" ? now + PEASHOOTER_SHOOT_MS : undefined,
-      lastContactAt: now,
-      cherryBombExplodesAt: selectedPlant === "cherryBomb" ? now + CHERRY_BOMB_FUSE_MS : undefined,
-      sunIntervalMs: selectedPlant === "sunflower" ? randomizeInterval(spec.generateMs || SUNFLOWER_GENERATION_MS) : undefined,
-      shootIntervalMs: selectedPlant === "peaShooter" ? randomizeInterval(spec.shootMs || PEASHOOTER_SHOOT_MS) : undefined,
-    };
-
-    setPlantsState([...plantsRef.current, newPlant]);
+    const fusionType = existingPlant ? getFusionType(existingPlant.type, selectedPlant) : null;
+    if (existingPlant && !fusionType) return;
+    const newPlant = getPlantInstance(fusionType || selectedPlant, row, col, now);
+    setPlantsState(existingPlant
+      ? plantsRef.current.map((plant) => plant.id === existingPlant.id ? newPlant : plant)
+      : [...plantsRef.current, newPlant]);
     setSunState(sunRef.current - spec.cost);
     setPlantReadyState({
       ...plantReadyRef.current,
@@ -570,12 +615,22 @@ export default function GameScreen() {
     const destinationPlant = plantsRef.current.find((plant) => plant.row === row && plant.col === col);
     const movingPlant = plantsRef.current.find((plant) => plant.id === movingPlantId);
     const tile = currentLevelRef.current?.tiles[row]?.[col] || "normal";
-    if (!movingPlant || destinationPlant || !getTileDefinition(tile).canPlant) {
+    const fusionType = movingPlant && destinationPlant && movingPlant.id !== destinationPlant.id
+      ? getFusionType(movingPlant.type, destinationPlant.type)
+      : null;
+    if (!movingPlant || (destinationPlant && !fusionType) || !getTileDefinition(tile).canPlant) {
       setMovingPlantId(null);
       return;
     }
     const now = Date.now();
-    setPlantsState(plantsRef.current.map((plant) => plant.id === movingPlantId ? { ...plant, row, col, lastContactAt: now } : plant));
+    if (fusionType && destinationPlant) {
+      const fusedPlant = getPlantInstance(fusionType, row, col, now);
+      setPlantsState(plantsRef.current
+        .filter((plant) => plant.id !== movingPlantId && plant.id !== destinationPlant.id)
+        .concat(fusedPlant));
+    } else {
+      setPlantsState(plantsRef.current.map((plant) => plant.id === movingPlantId ? { ...plant, row, col, lastContactAt: now } : plant));
+    }
     setMovingPlantId(null);
     setGloveSelected(false);
     setGloveReadyAt(now + (currentLevelRef.current?.gloveRechargeMs || 0));
@@ -821,19 +876,19 @@ export default function GameScreen() {
     }
 
     const explodingCherryBombs = nextPlants.filter(
-      (plant) => plant.type === "cherryBomb" && plant.cherryBombExplodesAt && now >= plant.cherryBombExplodesAt,
+      (plant) => (plant.type === "cherryBomb" || plant.type === "sunBomb") && plant.cherryBombExplodesAt && now >= plant.cherryBombExplodesAt,
     );
-    const getZombieImage = (zombieType: string) => zombieType === "imp" ? "/imp.webp" : zombieType === "gargantuar" ? "/gargantuar.webp" : "/zombie.webp";
+    const getZombieImage = (zombieType: string) => zombieType === "imp" ? "/zombie/imp.webp" : zombieType === "gargantuar" ? "/zombie/gargantuar.webp" : "/zombie/zombie.webp";
     const getZombieArmorImage = (zombieType: string, armor: number, armorBrokenAt?: number, now = Date.now()) => {
       const armorSpec = zombieType === "cone"
-        ? { max: 360, stage: 120, damaged: "/cone-damaged.webp", heavilyDamaged: "/cone-heavely-damaged.webp" }
+        ? { max: 360, stage: 120, damaged: "/zombie/cone-damaged.webp", heavilyDamaged: "/zombie/cone-heavely-damaged.webp" }
         : zombieType === "bucket"
-          ? { max: 1000, stage: 350, damaged: "/bucket-damaged.webp", heavilyDamaged: "/bucket-heavely-damaged.webp" }
+          ? { max: 1000, stage: 350, damaged: "/zombie/bucket-damaged.webp", heavilyDamaged: "/zombie/bucket-heavely-damaged.webp" }
           : null;
       if (!armorSpec || (armor <= 0 && (!armorBrokenAt || now - armorBrokenAt >= 2000))) return null;
       if (armor <= armorSpec.stage || armorBrokenAt) return armorSpec.heavilyDamaged;
       if (armor <= armorSpec.max - armorSpec.stage) return armorSpec.damaged;
-      return zombieType === "cone" ? "/cone.webp" : "/bucket.webp";
+      return zombieType === "cone" ? "/zombie/cone.webp" : "/zombie/bucket.webp";
     };
     const getZombieLabel = (zombieType: string) => zombieType === "basic"
       ? "Basic zombie"
@@ -854,10 +909,16 @@ export default function GameScreen() {
         armorBrokenAt: zombie.armor > 0 && armor === 0 ? now : zombie.armorBrokenAt,
       };
     };
+    const markDamage = (zombie: ZombieInstance, damage: number, sunOnKill = 0) => {
+      const damaged = applyZombieDamage(zombie, damage, now);
+      return damaged.hp <= 0 && zombie.hp > 0 && sunOnKill > 0
+        ? { ...damaged, sunOnKill }
+        : damaged;
+    };
     for (const cherryBomb of explodingCherryBombs) {
       nextZombies = nextZombies.map((zombie) => {
         const inBlast = Math.abs(zombie.row - cherryBomb.row) <= 1 && Math.abs(Math.floor(zombie.x) - cherryBomb.col) <= 1;
-        return inBlast ? applyZombieDamage(zombie, 1000, now) : zombie;
+        return inBlast ? markDamage(zombie, 1000, cherryBomb.type === "sunBomb" ? 25 : 0) : zombie;
       });
     }
     if (explodingCherryBombs.length > 0) {
@@ -866,8 +927,9 @@ export default function GameScreen() {
     }
 
     nextPlants = nextPlants.map((plant) => {
-      if (plant.type === "sunflower" && plant.nextSunAt && now >= plant.nextSunAt) {
-        const spec = PLANT_SPECS[plant.type];
+      const plantSpec = PLANT_SPECS[plant.type];
+      if ((plantSpec.generateMs && plant.nextSunAt && now >= plant.nextSunAt)
+        && ["sunflower", "sunNut", "twinSunflower", "sunshooter"].includes(plant.type)) {
         const startY = plant.row - 0.35;
         const startX = plant.col + 0.5;
         const targetX = plant.col + 0.1 + Math.random() * 0.8;
@@ -893,39 +955,53 @@ export default function GameScreen() {
           risingFrom: now,
           risingUntil: now,
           fallingUntil: now + arcDurationMs,
-          value: spec.generateAmount || 50,
+          value: plant.type === "twinSunflower" ? (plant.nextSunValue || 50) : (plantSpec.generateAmount || 50),
           expiresAt: now + SUN_LIFETIME_MS,
         });
-        const interval = plant.sunIntervalMs || (spec.generateMs || SUNFLOWER_GENERATION_MS);
+        const interval = plant.sunIntervalMs || (plantSpec.generateMs || SUNFLOWER_GENERATION_MS);
         return {
           ...plant,
           nextSunAt: plant.nextSunAt + interval,
+          nextSunValue: plant.type === "twinSunflower" ? (plant.nextSunValue === 50 ? 75 : 50) : plant.nextSunValue,
         };
       }
 
-      if (plant.type === "peaShooter" && plant.nextShotAt && now >= plant.nextShotAt) {
-        const spec = PLANT_SPECS[plant.type];
+      const canShoot = ["peaShooter", "peanut", "sunshooter", "repeater", "cherryBomber"].includes(plant.type);
+      if (canShoot && plant.nextShotAt && now >= plant.nextShotAt) {
         // Only shoot if there's at least one zombie ahead in the same row AND within grid bounds
         const anyAhead = zombiesRef.current.some(
           (z) => z.row === plant.row && z.x > plant.col && z.x >= 0 && z.x < gridCols && z.hp > 0
         );
         if (anyAhead) {
-          const shot: Projectile = {
-            id: createId(),
-            row: plant.row,
-            x: plant.col + 0.5,
-            damage: spec.damage || 20,
-          };
-          nextProjectiles = [...nextProjectiles, shot];
+          const shots = Array.from({ length: plantSpec.shotsPerBurst || 1 }, (_, index): Projectile => ({
+            id: createId(), row: plant.row, x: plant.col + 0.5,
+            damage: plantSpec.damage || 20, pierces: plantSpec.pierces === true,
+            image: plantSpec.projectileImage, blastDamage: plantSpec.projectileBlastDamage,
+            blastRadius: plantSpec.projectileBlastRadius, launchAt: now + index * (plantSpec.shotDelayMs || 0),
+          }));
+          nextProjectiles = [...nextProjectiles, ...shots];
         }
-        const interval = plant.shootIntervalMs || (spec.shootMs || PEASHOOTER_SHOOT_MS);
+        const interval = plant.shootIntervalMs || ((plantSpec.shootMs || PEASHOOTER_SHOOT_MS) * (plantSpec.fireRateMultiplier || 1));
         return {
           ...plant,
           nextShotAt: plant.nextShotAt + interval,
         };
       }
 
-      if (plant.type === "chomper") {
+      if (["chomper", "chompNut", "sunChomper", "chompShooter", "cherryChomper"].includes(plant.type)) {
+        if (plant.pendingShots && plant.pendingShots > 0 && plant.nextPendingShotAt && now >= plant.nextPendingShotAt) {
+          const shot: Projectile = {
+            id: createId(), row: plant.row, x: plant.col + 0.5,
+            damage: plantSpec.eatProjectileDamage || 80, pierces: false,
+            image: plantSpec.eatProjectileImage,
+          };
+          nextProjectiles = [...nextProjectiles, shot];
+          return {
+            ...plant,
+            pendingShots: plant.pendingShots - 1,
+            nextPendingShotAt: plant.pendingShots > 1 ? now + PEASHOOTER_SHOOT_MS : undefined,
+          };
+        }
         if (plant.sleepingUntil && now < plant.sleepingUntil) return plant;
 
         const target = nextZombies
@@ -936,11 +1012,27 @@ export default function GameScreen() {
         const targetMaxHp = ZOMBIE_SPECS[target.type]?.hp || target.hp;
         if (targetMaxHp <= 200) {
           nextZombies = nextZombies.map((zombie) => zombie.id === target.id ? { ...zombie, hp: 0 } : zombie);
-          return { ...plant, sleepingUntil: now + CHOMPER_SLEEP_MS, lastContactAt: now };
+          if (plantSpec.bonusSunOnEat) {
+            nextSuns.push({ id: createId(), row: plant.row, x: plant.col + 0.5, y: plant.row + 0.25, value: plantSpec.bonusSunOnEat, expiresAt: now + SUN_LIFETIME_MS });
+          }
+          if (plantSpec.eatExplosionDamage) {
+            nextZombies = nextZombies.map((zombie) => {
+              const inBlast = Math.abs(zombie.row - plant.row) <= 1 && Math.abs(Math.floor(zombie.x) - plant.col) <= 1;
+              return inBlast ? applyZombieDamage(zombie, plantSpec.eatExplosionDamage || 200, now) : zombie;
+            });
+          }
+          return {
+            ...plant,
+            hp: Math.min(plantSpec.hp, plant.hp + (plantSpec.regeneration || 0)),
+            sleepingUntil: now + CHOMPER_SLEEP_MS,
+            lastContactAt: now,
+            pendingShots: plantSpec.eatProjectileCount || plant.pendingShots,
+            nextPendingShotAt: plantSpec.eatProjectileCount ? now + CHOMPER_SLEEP_MS : plant.nextPendingShotAt,
+          };
         }
 
         if (now - (plant.lastContactAt || 0) >= CHOMPER_BITE_MS) {
-          nextZombies = nextZombies.map((zombie) => zombie.id === target.id ? applyZombieDamage(zombie, 40, now) : zombie);
+          nextZombies = nextZombies.map((zombie) => zombie.id === target.id ? applyZombieDamage(zombie, plantSpec.damage || 40, now) : zombie);
           return { ...plant, lastContactAt: now };
         }
       }
@@ -952,15 +1044,30 @@ export default function GameScreen() {
 
     // Move projectiles forward but do not affect zombies (zombies don't interact with grid)
     nextProjectiles = nextProjectiles.reduce<Projectile[]>((acc, projectile) => {
+      if (projectile.launchAt && now < projectile.launchAt) {
+        acc.push(projectile);
+        return acc;
+      }
       const moved = { ...projectile, x: projectile.x + PROJECTILE_SPEED_PER_TICK };
       // detect hit against nearest zombie in same row
-      const hitZombie = nextZombies
-        .filter((z) => z.row === moved.row && z.hp > 0 && moved.x >= z.x - 0.3)
-        .sort((a, b) => a.x - b.x)[0];
+      const hitZombies = nextZombies
+        .filter((z) => z.row === moved.row && z.hp > 0 && moved.x >= z.x - 0.3 && !projectile.hitZombieIds?.includes(z.id))
+        .sort((a, b) => a.x - b.x);
 
-      if (hitZombie) {
-        nextZombies = nextZombies.map((z) => z.id === hitZombie.id ? applyZombieDamage(z, moved.damage, now) : z);
-        return acc; // projectile consumed
+      if (hitZombies.length > 0) {
+        if (moved.blastDamage && moved.blastRadius) {
+          const blastCenter = hitZombies[0];
+          nextZombies = nextZombies.map((z) => {
+            const inBlast = Math.abs(z.row - blastCenter.row) <= moved.blastRadius! && Math.abs(Math.floor(z.x) - Math.floor(blastCenter.x)) <= moved.blastRadius!;
+            return inBlast ? applyZombieDamage(z, moved.blastDamage!, now) : z;
+          });
+        } else {
+          nextZombies = nextZombies.map((z) => hitZombies.some((hit) => hit.id === z.id) ? applyZombieDamage(z, moved.damage, now) : z);
+        }
+        if (!moved.pierces) return acc;
+        const hitZombieIds = [...(moved.hitZombieIds || []), ...hitZombies.map((z) => z.id)];
+        acc.push({ ...moved, hitZombieIds });
+        return acc;
       }
 
       // keep projectile alive while it's roughly within screen bounds
@@ -981,9 +1088,15 @@ export default function GameScreen() {
           zombie = { ...zombie, contactStartedAt: now };
         } else if (now - zombie.contactStartedAt >= zombieSpec.attackMs && now - zombie.lastAttackAt >= zombieSpec.attackMs) {
           const plant = nextPlants[plantIndex];
-          nextPlants[plantIndex] = plant.type === "cherryBomb"
-            ? plant
-            : { ...plant, hp: Math.max(0, plant.hp - zombieSpec.damage) };
+          const nextHp = plant.type === "cherryBomb" ? plant.hp : Math.max(0, plant.hp - zombieSpec.damage);
+          const stageChanged = plant.type === "explodeONut" && getNutDamageStage(plant.hp) !== getNutDamageStage(nextHp);
+          nextPlants[plantIndex] = { ...plant, hp: nextHp };
+          if (stageChanged) {
+            nextZombies = nextZombies.map((target) => {
+              const inBlast = Math.abs(target.row - plant.row) <= 1 && Math.abs(Math.floor(target.x) - plant.col) <= 1;
+              return inBlast ? applyZombieDamage(target, 1000, now) : target;
+            });
+          }
           zombie = { ...zombie, lastAttackAt: now };
         }
 
@@ -991,7 +1104,7 @@ export default function GameScreen() {
         const plant = nextPlants[plantIndex];
         const spec = PLANT_SPECS[plant.type];
         const contactInterval = spec.shootMs || PEASHOOTER_SHOOT_MS;
-        if (plant.type !== "chomper" && spec.damage && now - (plant.lastContactAt || 0) >= contactInterval) {
+        if (!["chomper", "chompNut", "sunChomper", "chompShooter", "cherryChomper"].includes(plant.type) && spec.damage && now - (plant.lastContactAt || 0) >= contactInterval) {
           zombie = applyZombieDamage(zombie, spec.damage, now);
           nextPlants[plantIndex] = { ...plant, lastContactAt: now };
         }
@@ -1015,6 +1128,16 @@ export default function GameScreen() {
       if (zombie.hp > 0 || defeatedZombieIdsRef.current.has(zombie.id)) return;
       defeatedZombieIdsRef.current.add(zombie.id);
       lastDefeatedZombie = zombie;
+      if (zombie.sunOnKill) {
+        nextSuns.push({
+          id: createId(),
+          row: zombie.row,
+          x: zombie.x,
+          y: zombie.row + 0.35,
+          value: zombie.sunOnKill,
+          expiresAt: now + SUN_LIFETIME_MS,
+        });
+      }
       const dropChance = ZOMBIE_SPECS[zombie.type]?.coinDropChance || 0;
       if (Math.random() >= dropChance) return;
       const isGold = Math.random() < 0.2;
@@ -1024,7 +1147,7 @@ export default function GameScreen() {
         x: zombie.x,
         y: zombie.row + 0.35,
         value: isGold ? 20 : 10,
-        image: isGold ? "/gold-coin.webp" : "/silver-coin.webp",
+        image: isGold ? "/other/gold-coin.webp" : "/other/silver-coin.webp",
         expiresAt: now + COIN_LIFETIME_MS,
       });
     });
@@ -1124,7 +1247,7 @@ export default function GameScreen() {
 
         {phase === "menu" && (
           <div className="main-menu">
-            <div className="menu-sunburst" aria-hidden="true"><img src="/sun.webp" alt="" /></div>
+            <div className="menu-sunburst" aria-hidden="true"><img src="/other/sun.webp" alt="" /></div>
             <p className="menu-kicker">Welcome to the lawn</p>
             <h2>Choose your defense</h2>
             <p className="menu-copy">Plant wisely, collect sun, and stop the zombie waves before they reach the house.</p>
@@ -1225,8 +1348,15 @@ export default function GameScreen() {
               {(["plants", "zombies", "tiles"] as AlmanacCategory[]).map((category) => <button key={category} type="button" role="tab" aria-selected={almanacCategory === category} onClick={() => setAlmanacCategory(category)} className={almanacCategory === category ? "active" : ""}>{category}</button>)}
             </div>
             <div className="almanac-grid">
-              {almanacCategory === "plants" && Object.values(PLANT_SPECS).map((spec) => <article key={spec.key} className="almanac-card"><div className="almanac-art plant-art"><img src={getPlantImage(spec.key)} alt="" /></div><div><p className="almanac-type">Plant</p><h3>{spec.name}</h3><p>{spec.summary}</p><dl><div><dt>Cost</dt><dd>{spec.cost} sun</dd></div><div><dt>Health</dt><dd>{spec.hp} HP</dd></div><div><dt>Recharge</dt><dd>{spec.rechargeMs / 1000}s</dd></div>{spec.damage && <div><dt>Damage</dt><dd>{spec.damage}</dd></div>}</dl></div></article>)}
-              {almanacCategory === "zombies" && Object.values(ZOMBIE_SPECS).map((spec) => <article key={spec.key} className="almanac-card"><div className="almanac-art zombie-art relative"><img src={getZombieImage(spec.key)} alt="" />{(spec.key === "cone" || spec.key === "bucket") && <img src={spec.key === "cone" ? "/cone.webp" : "/bucket.webp"} alt="" className="absolute object-contain" style={{ width: "33.333%", height: "33.333%", left: "40%", top: "18%", transform: "translateX(-50%)" }} />}</div><div><p className="almanac-type">Zombie</p><h3>{spec.name}</h3><p>{spec.summary}</p><dl><div><dt>Health</dt><dd>{spec.hp} HP</dd></div><div><dt>Speed</dt><dd>{Math.round(spec.moveMs / 100) / 10}s / tile</dd></div><div><dt>Damage</dt><dd>{spec.damage}</dd></div><div><dt>Attack</dt><dd>{spec.attackMs / 1000}s</dd></div><div><dt>Armor</dt><dd>{spec.armor}</dd></div></dl></div></article>)}
+              {almanacCategory === "plants" && !almanacPlantKey && BASE_PLANT_TYPES.map((plantKey) => {
+                const spec = PLANT_SPECS[plantKey];
+                return <article key={spec.key} className="almanac-card"><div className="almanac-art plant-art"><img src={getPlantImage(spec.key)} alt="" /></div><div><p className="almanac-type">Plant</p><h3>{spec.name}</h3><p>{spec.summary}</p><dl><div><dt>Cost</dt><dd>{spec.cost} sun</dd></div><div><dt>Health</dt><dd>{spec.hp} HP</dd></div><div><dt>Recharge</dt><dd>{spec.rechargeMs / 1000}s</dd></div>{spec.damage && <div><dt>Damage</dt><dd>{spec.damage}</dd></div>}</dl><button type="button" className="almanac-fusion-button" onClick={() => setAlmanacPlantKey(plantKey)}>View fusions</button></div></article>;
+              })}
+              {almanacCategory === "plants" && almanacPlantKey && <>
+                <div className="almanac-fusion-heading"><button type="button" className="text-button" onClick={() => setAlmanacPlantKey(null)}>Back to plants</button><div><p className="almanac-type">Fusions</p><h3>{PLANT_SPECS[almanacPlantKey].name} combinations</h3></div></div>
+                {Object.values(PLANT_SPECS).filter((spec) => spec.fusionOf?.includes(almanacPlantKey as never)).map((spec) => <article key={spec.key} className="almanac-card"><div className="almanac-art plant-art"><img src={getPlantImage(spec.key)} alt="" /></div><div><p className="almanac-type">Fusion plant</p><h3>{spec.name}</h3><p>{spec.summary}</p><p className="almanac-recipe">Requires {spec.fusionOf?.map((key) => PLANT_SPECS[key].name).join(" + ")}</p><dl><div><dt>Health</dt><dd>{spec.hp} HP</dd></div>{spec.damage && <div><dt>Damage</dt><dd>{spec.damage}</dd></div>}</dl></div></article>)}
+              </>}
+              {almanacCategory === "zombies" && Object.values(ZOMBIE_SPECS).map((spec) => <article key={spec.key} className="almanac-card"><div className="almanac-art zombie-art relative"><img src={getZombieImage(spec.key)} alt="" />{(spec.key === "cone" || spec.key === "bucket") && <img src={spec.key === "cone" ? "/zombie/cone.webp" : "/zombie/bucket.webp"} alt="" className="absolute object-contain" style={{ width: "33.333%", height: "33.333%", left: "40%", top: "18%", transform: "translateX(-50%)" }} />}</div><div><p className="almanac-type">Zombie</p><h3>{spec.name}</h3><p>{spec.summary}</p><dl><div><dt>Health</dt><dd>{spec.hp} HP</dd></div><div><dt>Speed</dt><dd>{Math.round(spec.moveMs / 100) / 10}s / tile</dd></div><div><dt>Damage</dt><dd>{spec.damage}</dd></div><div><dt>Attack</dt><dd>{spec.attackMs / 1000}s</dd></div><div><dt>Armor</dt><dd>{spec.armor}</dd></div></dl></div></article>)}
               {almanacCategory === "tiles" && Object.values(TILE_DEFINITIONS).map((tile) => <article key={tile.key} className="almanac-card tile-card"><div className={`almanac-tile-swatch ${tile.key}`} /><div><p className="almanac-type">Tile</p><h3>{tile.key === "normalDark" ? "Dark lawn" : tile.key === "normal" ? "Lawn" : "Obstructed"}</h3><p>{tile.description}</p><dl><div><dt>Plantable</dt><dd>{tile.canPlant ? "Yes" : "No"}</dd></div><div><dt>Label</dt><dd>{tile.label || "None"}</dd></div></dl></div></article>)}
             </div>
           </div>
@@ -1267,7 +1397,7 @@ export default function GameScreen() {
               <div className="loadout-heading"><div><p className="loadout-kicker">Incoming threats</p><h2>Zombies</h2></div><span className="zombie-count">{zombieTypes.length}</span></div>
               <div className="zombie-choice-list">
                 {zombieTypes.map((zombieType) => {
-                  return <div key={zombieType} className="zombie-choice"><div className="zombie-choice-art"><img src={getZombieImage(zombieType)} alt="" />{(zombieType === "cone" || zombieType === "bucket") && <img src={zombieType === "cone" ? "/cone.webp" : "/bucket.webp"} alt="" className="zombie-choice-hat" />}</div><div><strong>{getZombieLabel(zombieType)}</strong></div></div>;
+                  return <div key={zombieType} className="zombie-choice"><div className="zombie-choice-art"><img src={getZombieImage(zombieType)} alt="" />{(zombieType === "cone" || zombieType === "bucket") && <img src={zombieType === "cone" ? "/zombie/cone.webp" : "/zombie/bucket.webp"} alt="" className="zombie-choice-hat" />}</div><div><strong>{getZombieLabel(zombieType)}</strong></div></div>;
                 })}
               </div>
             </aside>
@@ -1278,16 +1408,16 @@ export default function GameScreen() {
         {(phase === "playing" || phase === "complete") && (
           <div className="mt-6 space-y-4">
             <div className="game-toolbar">
-              <div className="sun-counter" aria-label={`${sun} sun available`}><img src="/sun.webp" alt="" /> <strong>{sun}</strong></div>
+              <div className="sun-counter" aria-label={`${sun} sun available`}><img src="/other/sun.webp" alt="" /> <strong>{sun}</strong></div>
               <div className="seed-tray" aria-label="Seed packet selection" style={{ gridTemplateColumns: `repeat(${playerData.seedBankSize}, minmax(3rem, 4.4rem))` }}>
                 {selectedLoadout.map((plantKey) => {
                   const spec = PLANT_SPECS[plantKey];
-                  const ready = plantReadyRef.current[spec.key] <= gameTime;
+                  const ready = plantReadyRef.current[plantKey] <= gameTime;
                   const enoughSun = sunRef.current >= spec.cost;
                   const disabled = !ready || !enoughSun;
-                  const coolDown = Math.max(0, Math.ceil((plantReadyRef.current[spec.key] - gameTime) / 1000));
+                  const coolDown = Math.max(0, Math.ceil((plantReadyRef.current[plantKey] - gameTime) / 1000));
                   return (
-                    <button key={spec.key} type="button" aria-label={`${spec.name}, costs ${spec.cost} sun`} onClick={() => { setSelectedPlant(spec.key); setShovelSelected(false); setGloveSelected(false); setMovingPlantId(null); }} className={`seed-slot ${selectedPlant === spec.key && !shovelSelected && !gloveSelected ? "selected" : ""} ${disabled ? "unavailable" : ""}`}>
+                    <button key={plantKey} type="button" aria-label={`${spec.name}, costs ${spec.cost} sun`} onClick={() => { setSelectedPlant(plantKey); setShovelSelected(false); setGloveSelected(false); setMovingPlantId(null); }} className={`seed-slot ${selectedPlant === plantKey && !shovelSelected && !gloveSelected ? "selected" : ""} ${disabled ? "unavailable" : ""}`}>
                       <img src={getPlantImage(spec.key)} alt="" />
                       <span>{spec.cost}</span>
                       {!ready && <small>{coolDown}s</small>}
@@ -1296,8 +1426,8 @@ export default function GameScreen() {
                 })}
                 {Array.from({ length: Math.max(0, playerData.seedBankSize - selectedLoadout.length) }).map((_, index) => <div key={`empty-${index}`} className="seed-slot empty" aria-hidden="true" />)}
               </div>
-              <button type="button" aria-label="Select shovel" onClick={selectShovel} className={`shovel-button ${shovelSelected ? "selected" : ""}`}><img src="/shovel.webp" alt="" /></button>
-              {playerData.gloveUnlocked && <button type="button" aria-label="Select glove" onClick={selectGlove} disabled={gloveReadyAt > gameTime} className={`shovel-button glove-button ${gloveSelected ? "selected" : ""} ${gloveReadyAt > gameTime ? "unavailable" : ""}`}><img src="/glove.webp" alt="" />{gloveReadyAt > gameTime && <small>{Math.ceil((gloveReadyAt - gameTime) / 1000)}s</small>}</button>}
+              <button type="button" aria-label="Select shovel" onClick={selectShovel} className={`shovel-button ${shovelSelected ? "selected" : ""}`}><img src="/other/shovel.webp" alt="" /></button>
+              {playerData.gloveUnlocked && <button type="button" aria-label="Select glove" onClick={selectGlove} disabled={gloveReadyAt > gameTime} className={`shovel-button glove-button ${gloveSelected ? "selected" : ""} ${gloveReadyAt > gameTime ? "unavailable" : ""}`}><img src="/other/glove.webp" alt="" />{gloveReadyAt > gameTime && <small>{Math.ceil((gloveReadyAt - gameTime) / 1000)}s</small>}</button>}
               <button type="button" aria-label="Open pause menu" onClick={() => setIsPaused(true)} className="settings-button">⚙</button>
             </div>
 
@@ -1342,11 +1472,15 @@ export default function GameScreen() {
                       {plant && (
                         <div className="plant-idle relative z-10 h-full w-full text-xs text-lime-200">
                           {(() => {
-                            const wallNutImage = plant.type === "wallNut"
-                              ? plant.hp <= 1000 ? "/wall-nut-heavely-damaged.webp" : plant.hp <= 2500 ? "/wall-nut-damaged.webp" : "/wall-nut.webp"
+                            const isNutPlant = ["wallNut", "peanut", "sunNut", "tallNut", "explodeONut"].includes(plant.type);
+                            const nutStage = plant.type === "tallNut"
+                              ? plant.hp <= 2000 ? 2 : plant.hp <= 4000 ? 1 : 0
+                              : getNutDamageStage(plant.hp);
+                            const wallNutImage = isNutPlant
+                              ? getNutDamageImage(plant.type, nutStage)
                               : getPlantImage(plant.type);
-                            const isSleeping = plant.type === "chomper" && plant.sleepingUntil && plant.sleepingUntil > gameTime;
-                            const cherryGrowth = plant.type === "cherryBomb" && plant.cherryBombExplodesAt
+                            const isSleeping = (plant.type === "chomper" || plant.type === "chompNut") && plant.sleepingUntil && plant.sleepingUntil > gameTime;
+                            const cherryGrowth = (plant.type === "cherryBomb" || plant.type === "sunBomb") && plant.cherryBombExplodesAt
                               ? Math.min(1, Math.max(0, 1 - (plant.cherryBombExplodesAt - gameTime) / CHERRY_BOMB_FUSE_MS))
                               : 0;
                             return (
@@ -1355,7 +1489,7 @@ export default function GameScreen() {
                                 alt={PLANT_SPECS[plant.type].name}
                                 className="absolute inset-0 h-full w-full scale-125 object-contain"
                                 style={{
-                                  transform: plant.type === "cherryBomb"
+                                  transform: plant.type === "cherryBomb" || plant.type === "sunBomb"
                                     ? `scale(${0.75 + cherryGrowth * 0.35})`
                                     : isSleeping ? "scale(1.05, 0.72)" : "scale(1.25)",
                                   filter: isSleeping ? "brightness(0.58)" : undefined,
@@ -1395,7 +1529,7 @@ export default function GameScreen() {
                     }}
                   >
                     <img
-                      src="/sun.webp"
+                      src="/other/sun.webp"
                       alt=""
                       className="block object-contain drop-shadow-lg"
                       style={{
@@ -1437,9 +1571,9 @@ export default function GameScreen() {
                     <span className="reward-card">
                       <img
                         src={rewardDrop.kind === "money"
-                          ? "/money-bag.webp"
+                          ? "/other/money-bag.webp"
                           : rewardDrop.kind === "glove"
-                            ? "/glove.webp"
+                            ? "/other/glove.webp"
                             : getPlantImage(rewardDrop.plantKey || "peaShooter")}
                         alt=""
                         className="reward-art"
@@ -1448,7 +1582,7 @@ export default function GameScreen() {
                     </span>
                     {rewardDrop.kind === "money" && rewardAnimation === "coins" && (
                       <span className="reward-coin-burst" aria-hidden="true">
-                        {Array.from({ length: 8 }).map((_, index) => <img key={index} src="/gold-coin.webp" alt="" className="reward-coin" />)}
+                        {Array.from({ length: 8 }).map((_, index) => <img key={index} src="/other/gold-coin.webp" alt="" className="reward-coin" />)}
                       </span>
                     )}
                   </button>
@@ -1492,7 +1626,7 @@ export default function GameScreen() {
                     }}
                   >
                     <img
-                      src="/projectile-pea.webp"
+                      src={p.image || "/plants/projectile-pea.webp"}
                       alt=""
                       className="block h-5 w-5 object-contain"
                     />
@@ -1538,7 +1672,7 @@ export default function GameScreen() {
             />
           )}
           <img
-            src={shovelSelected ? "/shovel.webp" : "/glove.webp"}
+            src={shovelSelected ? "/other/shovel.webp" : "/other/glove.webp"}
             alt=""
             aria-hidden="true"
             className={`tool-cursor-image ${gloveSelected ? "tool-cursor-glove" : "tool-cursor-shovel"}`}

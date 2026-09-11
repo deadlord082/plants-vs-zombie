@@ -1,11 +1,13 @@
-export type PlantTypeKey = "sunflower" | "peaShooter" | "wallNut" | "chomper" | "cherryBomb";
+export type BasePlantTypeKey = "sunflower" | "peaShooter" | "wallNut" | "chomper" | "cherryBomb";
+export type FusionPlantTypeKey = "peanut" | "sunNut" | "tallNut" | "chompNut" | "explodeONut" | "twinSunflower" | "sunBomb" | "sunChomper" | "sunshooter" | "repeater" | "chompShooter" | "cherryBomber" | "cherryChomper";
+export type PlantTypeKey = BasePlantTypeKey | FusionPlantTypeKey;
 export type LevelCategory = "day" | "night" | "pool" | "fog" | "roof" | "mini-game";
 export type GamePhase = "menu" | "category-select" | "level-select" | "shop" | "almanac" | "credits" | "loadout" | "playing" | "complete";
 import type { TileType } from "./tiles";
 
 export interface LevelReward {
   money?: number;
-  unlockPlants?: PlantTypeKey[];
+  unlockPlants?: BasePlantTypeKey[];
   glove?: boolean;
 }
 
@@ -41,6 +43,23 @@ export interface PlantSpec {
   generateMs?: number;
   firstBurstMs?: number;
   shootMs?: number;
+  fusionOf?: [BasePlantTypeKey, BasePlantTypeKey];
+  pierces?: boolean;
+  regeneration?: number;
+  explosionOnDamageStage?: boolean;
+  projectileImage?: string;
+  projectileDamage?: number;
+  projectileBlastDamage?: number;
+  projectileBlastRadius?: number;
+  projectileSunOnKill?: number;
+  bonusSunOnEat?: number;
+  shotsPerBurst?: number;
+  shotDelayMs?: number;
+  fireRateMultiplier?: number;
+  eatProjectileCount?: number;
+  eatProjectileDamage?: number;
+  eatProjectileImage?: string;
+  eatExplosionDamage?: number;
 }
 
 export interface PlantInstance {
@@ -57,6 +76,9 @@ export interface PlantInstance {
   cherryBombExplodesAt?: number;
   sunIntervalMs?: number; // randomized sun generation interval
   shootIntervalMs?: number; // randomized attack interval
+  pendingShots?: number;
+  nextPendingShotAt?: number;
+  nextSunValue?: number;
 }
 
 export interface ZombieInstance {
@@ -73,6 +95,7 @@ export interface ZombieInstance {
   type: string;
   armorBrokenAt?: number;
   contactStartedAt?: number;
+  sunOnKill?: number;
 }
 
 export interface Projectile {
@@ -80,6 +103,13 @@ export interface Projectile {
   row: number;
   x: number;
   damage: number;
+  pierces: boolean;
+  hitZombieIds?: string[];
+  image?: string;
+  blastDamage?: number;
+  blastRadius?: number;
+  sunOnKill?: number;
+  launchAt?: number;
 }
 
 export interface SunInstance {

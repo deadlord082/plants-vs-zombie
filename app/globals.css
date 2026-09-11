@@ -1364,6 +1364,42 @@ body {
   font-weight: 800;
 }
 
+.almanac-fusion-button {
+  margin-top: 0.75rem;
+  padding: 0.45rem 0.65rem;
+  border: 2px solid #d49a46;
+  border-radius: 0.3rem;
+  background: #5a3824;
+  color: #fff0b4;
+  font-size: 0.72rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.almanac-fusion-button:hover {
+  background: #8eaf50;
+}
+
+.almanac-fusion-heading {
+  display: flex;
+  grid-column: 1 / -1;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.25rem 0;
+}
+
+.almanac-fusion-heading h3 {
+  margin: 0.15rem 0 0;
+}
+
+.almanac-recipe {
+  margin-top: 0.75rem !important;
+  color: #ffe89d;
+  font-size: 0.78rem !important;
+  font-weight: 800;
+}
+
 .almanac-tile-swatch {
   min-height: 7rem;
   border: 2px solid rgba(255, 255, 255, 0.2);
