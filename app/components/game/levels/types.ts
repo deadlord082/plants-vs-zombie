@@ -3,7 +3,7 @@
  */
 
 import type { TileType } from "../tiles";
-import type { LevelReward } from "../types";
+import type { LevelCategory, LevelReward } from "../types";
 
 export interface ZombieSpawn {
   type: "basic" | "imp" | "cone" | "bucket" | "gargantuar";
@@ -17,6 +17,7 @@ export interface WaveDefinition {
 
 export interface LevelDefinition {
   id: number;
+  category?: LevelCategory;
   unlockAfterLevelId?: number;
   title: string;
   description: string;
@@ -36,6 +37,7 @@ export interface LevelDefinition {
  */
 export interface CompiledLevelConfig {
   id: number;
+  category: LevelCategory;
   unlockAfterLevelId?: number;
   title: string;
   description: string;

@@ -34,6 +34,7 @@ import type {
   Projectile,
   SunInstance,
   ZombieInstance,
+  LevelCategory,
 } from "./types";
 import { LEVELS } from "./levels";
 import { getTileDefinition, TILE_DEFINITIONS } from "./tiles";
@@ -54,14 +55,14 @@ const getZombieImage = (zombieType: string) => zombieType === "imp" ? "/imp.webp
 
 const getZombieArmorImage = (zombieType: string, armor: number, armorBrokenAt?: number, now = Date.now()) => {
   const armorSpec = zombieType === "cone"
-    ? { max: 360, stage: 120, damaged: "/cone-damaged.png", heavilyDamaged: "/cone-heavely-damaged.png" }
+    ? { max: 360, stage: 120, damaged: "/cone-damaged.webp", heavilyDamaged: "/cone-heavely-damaged.webp" }
     : zombieType === "bucket"
-      ? { max: 1000, stage: 350, damaged: "/bucket-damaged.png", heavilyDamaged: "/bucket-heavely-damaged.png" }
+      ? { max: 1000, stage: 350, damaged: "/bucket-damaged.webp", heavilyDamaged: "/bucket-heavely-damaged.webp" }
       : null;
   if (!armorSpec || (armor <= 0 && (!armorBrokenAt || now - armorBrokenAt >= 2000))) return null;
   if (armor <= armorSpec.stage || armorBrokenAt) return armorSpec.heavilyDamaged;
   if (armor <= armorSpec.max - armorSpec.stage) return armorSpec.damaged;
-  return zombieType === "cone" ? "/cone.png" : "/bucket.png";
+  return zombieType === "cone" ? "/cone.webp" : "/bucket.webp";
 };
 
 const getZombieLabel = (zombieType: string) => zombieType === "basic"
@@ -100,6 +101,15 @@ const DEFAULT_PLAYER_DATA: PlayerData = {
 };
 type AlmanacCategory = "plants" | "zombies" | "tiles";
 
+const LEVEL_CATEGORIES: Array<{ key: LevelCategory; name: string; description: string }> = [
+  { key: "day", name: "Day", description: "Bright lawns and the beginning of the adventure." },
+  { key: "night", name: "Night", description: "A quiet lawn with surprises waiting in the dark." },
+  { key: "pool", name: "Pool", description: "Water changes the shape of the battle." },
+  { key: "fog", name: "Fog", description: "Keep your eyes open through the mist." },
+  { key: "roof", name: "Roof", description: "A rooftop battlefield with a different rhythm." },
+  { key: "mini-game", name: "Mini-game", description: "Short challenges with their own rules." },
+];
+
 interface PlayerData {
   money: number;
   unlockedPlants: PlantTypeKey[];
@@ -118,6 +128,7 @@ export default function GameScreen() {
   const [selectedPlant, setSelectedPlant] = useState<PlantTypeKey>("peaShooter");
   const [selectedLoadout, setSelectedLoadout] = useState<PlantTypeKey[]>([]);
   const [almanacCategory, setAlmanacCategory] = useState<AlmanacCategory>("plants");
+  const [selectedLevelCategory, setSelectedLevelCategory] = useState<LevelCategory>("day");
   const [shovelSelected, setShovelSelected] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [currentLevel, setCurrentLevel] = useState<LevelConfig | null>(null);
@@ -658,14 +669,14 @@ export default function GameScreen() {
     const getZombieImage = (zombieType: string) => zombieType === "imp" ? "/imp.webp" : zombieType === "gargantuar" ? "/gargantuar.webp" : "/zombie.webp";
     const getZombieArmorImage = (zombieType: string, armor: number, armorBrokenAt?: number, now = Date.now()) => {
       const armorSpec = zombieType === "cone"
-        ? { max: 360, stage: 120, damaged: "/cone-damaged.png", heavilyDamaged: "/cone-heavely-damaged.png" }
+        ? { max: 360, stage: 120, damaged: "/cone-damaged.webp", heavilyDamaged: "/cone-heavely-damaged.webp" }
         : zombieType === "bucket"
-          ? { max: 1000, stage: 350, damaged: "/bucket-damaged.png", heavilyDamaged: "/bucket-heavely-damaged.png" }
+          ? { max: 1000, stage: 350, damaged: "/bucket-damaged.webp", heavilyDamaged: "/bucket-heavely-damaged.webp" }
           : null;
       if (!armorSpec || (armor <= 0 && (!armorBrokenAt || now - armorBrokenAt >= 2000))) return null;
       if (armor <= armorSpec.stage || armorBrokenAt) return armorSpec.heavilyDamaged;
       if (armor <= armorSpec.max - armorSpec.stage) return armorSpec.damaged;
-      return zombieType === "cone" ? "/cone.png" : "/bucket.png";
+      return zombieType === "cone" ? "/cone.webp" : "/bucket.webp";
     };
     const getZombieLabel = (zombieType: string) => zombieType === "basic"
       ? "Basic zombie"
@@ -854,7 +865,7 @@ export default function GameScreen() {
         x: zombie.x,
         y: zombie.row + 0.35,
         value: isGold ? 20 : 10,
-        image: isGold ? "/gold-coin.png" : "/silver-coin.webp",
+        image: isGold ? "/gold-coin.webp" : "/silver-coin.webp",
         expiresAt: now + COIN_LIFETIME_MS,
       });
     });
@@ -917,15 +928,19 @@ export default function GameScreen() {
   const title =
     phase === "menu"
       ? "Plants vs. Zombies"
-      : phase === "level-select"
-        ? "Select a Level"
-        : phase === "shop"
-          ? "Shop"
-          : phase === "almanac"
-            ? "Almanac"
-            : currentLevel
-              ? currentLevel.title
-              : "Level";
+      : phase === "category-select"
+        ? "Select a Category"
+        : phase === "level-select"
+          ? "Select a Level"
+          : phase === "shop"
+            ? "Shop"
+            : phase === "almanac"
+              ? "Almanac"
+                : phase === "credits"
+                  ? "Credits"
+              : currentLevel
+                ? currentLevel.title
+                : "Level";
   const waveStageLabel = (() => {
     if (!currentLevel) return "";
     const nextWave = compiledCurrentLevel?.spawnWaves[spawnScheduleRef.current.batchIndex];
@@ -943,7 +958,7 @@ export default function GameScreen() {
     : [];
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 px-4 py-8 sm:px-8">
+    <div className={`min-h-screen bg-slate-950 text-slate-100 px-4 py-8 sm:px-8 ${phase === "credits" ? "credits-mode" : ""}`}>
       <div className="mx-auto max-w-7xl">
         <h1 className="text-4xl font-bold tracking-tight text-lime-300">{title}</h1>
 
@@ -958,18 +973,55 @@ export default function GameScreen() {
               <span>Seed slots: {playerData.seedBankSize}</span>
             </div>
             <div className="menu-actions">
-              <button type="button" onClick={() => setPhase("level-select")} className="menu-primary">Start Game <span>→</span></button>
+              <button type="button" onClick={() => setPhase("category-select")} className="menu-primary">Start Game <span>→</span></button>
               <button type="button" onClick={() => setPhase("shop")} className="menu-secondary">Shop <span>◆</span></button>
               <button type="button" onClick={() => setPhase("almanac")} className="menu-secondary">Open Almanac <span>▣</span></button>
+              <button type="button" onClick={() => setPhase("credits")} className="menu-secondary">Credits <span>✦</span></button>
+            </div>
+          </div>
+        )}
+
+        {phase === "credits" && (
+          <div className="credits-screen">
+            <div className="credits-scroll" aria-label="Credits">
+              <div className="credits-content">
+                <p className="credits-kicker">Plants vs. Zombies</p>
+                <h2>Credits</h2>
+                <p>This game is heavily inspired by the original Plants vs. Zombies from EA.</p>
+                <p>Everything has been made by me.</p>
+                <p className="credits-name">Gaboriau Lukas</p>
+                <p className="credits-thanks">Thank you for playing.</p>
+              </div>
+            </div>
+            <button type="button" onClick={() => setPhase("menu")} className="credits-back-button">Back to main menu</button>
+          </div>
+        )}
+
+        {phase === "category-select" && (
+          <div className="level-select-screen category-select-screen">
+            <div className="screen-heading"><div><p className="menu-kicker">Choose your chapter</p><h2>Select a Category</h2><p>Every category brings a different kind of lawn.</p></div><button type="button" onClick={() => setPhase("menu")} className="text-button">Back to menu</button></div>
+            <div className="category-card-grid">
+              {LEVEL_CATEGORIES.map((category) => {
+                const categoryLevels = LEVELS.filter((level) => level.category === category.key);
+                const isCompleted = categoryLevels.length > 0 && categoryLevels.every((level) => playerData.completedLevels.includes(level.id));
+                return (
+                  <button key={category.key} type="button" onClick={() => { setSelectedLevelCategory(category.key); setPhase("level-select"); }} className={`category-card ${isCompleted ? "completed" : ""}`}>
+                    {isCompleted && <span className="level-completed-ribbon">Completed</span>}
+                    <span className="category-card-number">{categoryLevels.length || "-"}</span>
+                    <span className="category-card-content"><strong>{category.name}</strong><small>{category.description}</small><em>{categoryLevels.length ? `${categoryLevels.length} level${categoryLevels.length === 1 ? "" : "s"}` : "Coming soon"}</em></span>
+                    <span className="category-card-arrow">→</span>
+                  </button>
+                );
+              })}
             </div>
           </div>
         )}
 
         {phase === "level-select" && (
           <div className="level-select-screen">
-            <div className="screen-heading"><div><p className="menu-kicker">The backyard awaits</p><h2>Select a Level</h2><p>Each lawn brings a different layout and wave pattern.</p></div><button type="button" onClick={() => setPhase("menu")} className="text-button">Back</button></div>
+            <div className="screen-heading"><div><p className="menu-kicker">{LEVEL_CATEGORIES.find((category) => category.key === selectedLevelCategory)?.name} category</p><h2>Select a Level</h2><p>Each lawn brings a different layout and wave pattern.</p></div><button type="button" onClick={() => setPhase("category-select")} className="text-button">Back</button></div>
             <div className="level-card-grid">
-              {LEVELS.map((level) => (
+              {LEVELS.filter((level) => level.category === selectedLevelCategory).map((level) => (
                 <div key={level.id} className={`level-card ${level.unlockAfterLevelId !== undefined && !playerData.completedLevels.includes(level.unlockAfterLevelId) ? "locked" : ""}`}>
                   {playerData.completedLevels.includes(level.id) && <span className="level-completed-ribbon">Completed</span>}
                   <div className="level-card-content">
@@ -1014,7 +1066,7 @@ export default function GameScreen() {
             </div>
             <div className="almanac-grid">
               {almanacCategory === "plants" && Object.values(PLANT_SPECS).map((spec) => <article key={spec.key} className="almanac-card"><div className="almanac-art plant-art"><img src={getPlantImage(spec.key)} alt="" /></div><div><p className="almanac-type">Plant</p><h3>{spec.name}</h3><p>{spec.summary}</p><dl><div><dt>Cost</dt><dd>{spec.cost} sun</dd></div><div><dt>Health</dt><dd>{spec.hp} HP</dd></div><div><dt>Recharge</dt><dd>{spec.rechargeMs / 1000}s</dd></div>{spec.damage && <div><dt>Damage</dt><dd>{spec.damage}</dd></div>}</dl></div></article>)}
-              {almanacCategory === "zombies" && Object.values(ZOMBIE_SPECS).map((spec) => <article key={spec.key} className="almanac-card"><div className="almanac-art zombie-art relative"><img src={getZombieImage(spec.key)} alt="" />{(spec.key === "cone" || spec.key === "bucket") && <img src={spec.key === "cone" ? "/cone.png" : "/bucket.png"} alt="" className="absolute object-contain" style={{ width: "33.333%", height: "33.333%", left: "40%", top: "18%", transform: "translateX(-50%)" }} />}</div><div><p className="almanac-type">Zombie</p><h3>{spec.name}</h3><p>{spec.summary}</p><dl><div><dt>Health</dt><dd>{spec.hp} HP</dd></div><div><dt>Speed</dt><dd>{Math.round(spec.moveMs / 100) / 10}s / tile</dd></div><div><dt>Damage</dt><dd>{spec.damage}</dd></div><div><dt>Attack</dt><dd>{spec.attackMs / 1000}s</dd></div><div><dt>Armor</dt><dd>{spec.armor}</dd></div></dl></div></article>)}
+              {almanacCategory === "zombies" && Object.values(ZOMBIE_SPECS).map((spec) => <article key={spec.key} className="almanac-card"><div className="almanac-art zombie-art relative"><img src={getZombieImage(spec.key)} alt="" />{(spec.key === "cone" || spec.key === "bucket") && <img src={spec.key === "cone" ? "/cone.webp" : "/bucket.webp"} alt="" className="absolute object-contain" style={{ width: "33.333%", height: "33.333%", left: "40%", top: "18%", transform: "translateX(-50%)" }} />}</div><div><p className="almanac-type">Zombie</p><h3>{spec.name}</h3><p>{spec.summary}</p><dl><div><dt>Health</dt><dd>{spec.hp} HP</dd></div><div><dt>Speed</dt><dd>{Math.round(spec.moveMs / 100) / 10}s / tile</dd></div><div><dt>Damage</dt><dd>{spec.damage}</dd></div><div><dt>Attack</dt><dd>{spec.attackMs / 1000}s</dd></div><div><dt>Armor</dt><dd>{spec.armor}</dd></div></dl></div></article>)}
               {almanacCategory === "tiles" && Object.values(TILE_DEFINITIONS).map((tile) => <article key={tile.key} className="almanac-card tile-card"><div className={`almanac-tile-swatch ${tile.key}`} /><div><p className="almanac-type">Tile</p><h3>{tile.key === "normalDark" ? "Dark lawn" : tile.key === "normal" ? "Lawn" : "Obstructed"}</h3><p>{tile.description}</p><dl><div><dt>Plantable</dt><dd>{tile.canPlant ? "Yes" : "No"}</dd></div><div><dt>Label</dt><dd>{tile.label || "None"}</dd></div></dl></div></article>)}
             </div>
           </div>
@@ -1055,7 +1107,7 @@ export default function GameScreen() {
               <div className="loadout-heading"><div><p className="loadout-kicker">Incoming threats</p><h2>Zombies</h2></div><span className="zombie-count">{zombieTypes.length}</span></div>
               <div className="zombie-choice-list">
                 {zombieTypes.map((zombieType) => {
-                  return <div key={zombieType} className="zombie-choice"><div className="zombie-choice-art"><img src={getZombieImage(zombieType)} alt="" />{(zombieType === "cone" || zombieType === "bucket") && <img src={zombieType === "cone" ? "/cone.png" : "/bucket.png"} alt="" className="zombie-choice-hat" />}</div><div><strong>{getZombieLabel(zombieType)}</strong></div></div>;
+                  return <div key={zombieType} className="zombie-choice"><div className="zombie-choice-art"><img src={getZombieImage(zombieType)} alt="" />{(zombieType === "cone" || zombieType === "bucket") && <img src={zombieType === "cone" ? "/cone.webp" : "/bucket.webp"} alt="" className="zombie-choice-hat" />}</div><div><strong>{getZombieLabel(zombieType)}</strong></div></div>;
                 })}
               </div>
             </aside>

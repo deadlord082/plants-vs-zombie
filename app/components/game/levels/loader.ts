@@ -60,6 +60,7 @@ export function compileLevelDefinition(def: LevelDefinition): CompiledLevelConfi
 
   return {
     id: def.id,
+    category: def.category || "day",
     unlockAfterLevelId: def.unlockAfterLevelId,
     title: def.title,
     description: def.description,
@@ -88,6 +89,7 @@ export function compileLevelDefinition(def: LevelDefinition): CompiledLevelConfi
 export function toLevelConfig(compiled: CompiledLevelConfig): LevelConfig {
   return {
     id: compiled.id,
+    category: compiled.category,
     unlockAfterLevelId: compiled.unlockAfterLevelId,
     title: compiled.title,
     description: compiled.description,

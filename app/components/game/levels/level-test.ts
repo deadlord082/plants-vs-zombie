@@ -19,6 +19,6 @@ export const LEVEL_test: LevelDefinition = {
   ],
   // Each wave batch spawns together; boss waves use the boss spawn timing.
   waves: [
-    { zombies: [{ type: "cone", count: 1 }] },
+    { zombies: [{ type: "bucket", count: 1 }] },
   ],
 };

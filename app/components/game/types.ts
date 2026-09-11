@@ -1,5 +1,6 @@
 export type PlantTypeKey = "sunflower" | "peaShooter" | "wallNut" | "chomper" | "cherryBomb";
-export type GamePhase = "menu" | "level-select" | "shop" | "loadout" | "almanac" | "playing" | "complete";
+export type LevelCategory = "day" | "night" | "pool" | "fog" | "roof" | "mini-game";
+export type GamePhase = "menu" | "category-select" | "level-select" | "shop" | "almanac" | "credits" | "loadout" | "playing" | "complete";
 import type { TileType } from "./tiles";
 
 export interface LevelReward {
@@ -9,6 +10,7 @@ export interface LevelReward {
 
 export interface LevelConfig {
   id: number;
+  category: LevelCategory;
   unlockAfterLevelId?: number;
   title: string;
   description: string;

@@ -44,7 +44,7 @@ This repository is a Next.js remake of Plants vs. Zombies. The main game screen 
 - Basic zombies and imps have a `0.01` drop chance; conehead zombies have a `0.02` drop chance.
 - Buckethead zombies have a `0.02` drop chance and Gargantuars have a `0.1` drop chance.
 - Each defeated zombie may roll for at most one coin drop. A successful drop has a 20% chance to be gold worth `$20`, otherwise it is silver worth `$10`.
-- Use `/public/silver-coin.webp` for silver coins and `/public/gold-coin.png` for gold coins. Coins are collectible by mouse hover or keyboard focus and expire after 15 seconds.
+- Use `/public/silver-coin.webp` for silver coins and `/public/gold-coin.webp` for gold coins. Coins are collectible by mouse hover or keyboard focus and expire after 15 seconds.
 - Coin drops are separate from sun drops and must not affect the sun counter. Keep coin motion, expiration, collection, and money synchronization in `GameScreen.tsx`.
 
 ### Sun System
@@ -97,7 +97,7 @@ Tile types are declared in `app/components/game/tiles.ts`. Each tile definition 
 - Basic zombies render from `public/zombie.webp`. The sprite should be scaled larger than the original placeholder but kept from expanding downward; it should grow upward and sideways while staying grounded at the bottom edge.
 - Plant image tiles should not render the old bordered container when the sprite is present; the image should visually fill the tile area more cleanly.
 - Cone and bucket art is rendered as a small overlay on top of the normal zombie sprite, not as a replacement sprite. Keep the overlay positioned independently for the Almanac, loadout roster, and in-game zombie; the loadout and in-game overlays should remain above the zombie's head and aligned toward its center.
-- The loadout roster must use a positioned image wrapper so cone and bucket overlays align with the zombie sprite rather than the whole roster row. The Almanac and loadout use the supplied `cone.png` and `bucket.png` assets.
+- The loadout roster must use a positioned image wrapper so cone and bucket overlays align with the zombie sprite rather than the whole roster row. The Almanac and loadout use the supplied `cone.webp` and `bucket.webp` assets.
 - The shovel control uses `public/shovel.webp` as a centered icon-only button with no visible text label.
 - Plant sprites may extend beyond their lawn cell bounds so large artwork is not cropped by the cell border; keep the plant layer above the tile layer.
 - The project uses a debug-only health overlay: press `H` to toggle health text for all plants and zombies, defaulting to hidden.
