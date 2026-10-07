@@ -1,0 +1,27 @@
+----------------- truc a faire classé par importance -----------------------
+
+choper des vrais assets pour les projectiles des fusions.
+trouver un putain d'asset pour l'explosion de cherry bomb.
+rajouter un lawnmower par niveaux qui se déclenche une fois dans la lane perdante.
+fix le gargantuars qui est trop large pour tenir sur une lane.
+fix le bug du jeu en pause ou les soleils et zombie on leur tick de spawn qui avance.
+
+rajouter des sonds / musiques.
+rajouter des tiles / les utiliser dans les nouveaux niveaux
+ajouter nouveaux zombie/commencez les fusions sur les zombie.
+rajouter paramètres langues à sauvegarder dans les data du joueurs.
+
+rajouter un système de lock sur l'almanac pour montrer que les plantes unlock.
+rajouter un background sur les niveaux/categorie selon l'environnement.
+rajouter de la vrais herbe pour les tiles.
+rajouter des animations sur les zombie (morts, manger, déplacer).
+
+---------------- Idee -------------
+
+idée zombie : football zombie, torch zombie
+et jouer sur les tiles aussi : 
+burn tile -> deal 20 damage every tick (on plants and zombie),
+sun tile -> upgrade sun generated on the tile
+ajouter des tiles avec des trucs dessus genre statue qui bloc les projectiles ou les zombies
+attack speed tile / health upgrade tile / damage tile / ...
+fume + fume = gloom

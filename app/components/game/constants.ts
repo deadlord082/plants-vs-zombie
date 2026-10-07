@@ -18,10 +18,11 @@ export const PEASHOOTER_SHOOT_MS = 1500;
 export const CHOMPER_BITE_MS = 1500;
 export const CHOMPER_SLEEP_MS = 10000;
 export const CHERRY_BOMB_FUSE_MS = 2000;
+export const ICEBERG_LETTUCE_FUSE_MS = 1000;
 export const PROJECTILE_SPEED_PER_TICK = 0.8;
 export const GAME_TICK_MS = 200;
 
-export const BASE_PLANT_TYPES: BasePlantTypeKey[] = ["sunflower", "peaShooter", "wallNut", "chomper", "cherryBomb"];
+export const BASE_PLANT_TYPES: BasePlantTypeKey[] = ["sunflower", "peaShooter", "wallNut", "chomper", "cherryBomb", "icebergLettuce"];
 
 export const PLANT_SPECS: Record<PlantTypeKey, PlantSpec> = {
   sunflower: {
@@ -72,6 +73,17 @@ export const PLANT_SPECS: Record<PlantTypeKey, PlantSpec> = {
     summary: "Explodes after 2 seconds, dealing 1,000 damage to every zombie in a 3x3 area.",
     damage: 1000,
   },
+  icebergLettuce: {
+    key: "icebergLettuce",
+    name: "Iceberg Lettuce",
+    hp: 300,
+    cost: 25,
+    rechargeMs: 15000,
+    summary: "Waits for a zombie, then freezes every zombie in its tile for 5 seconds.",
+    freezeDurationMs: 5000,
+    freezeOnContact: true,
+    triggerExplosion: true,
+  },
   peanut: {
     key: "peanut",
     name: "Peanut",
@@ -104,6 +116,7 @@ export const PLANT_SPECS: Record<PlantTypeKey, PlantSpec> = {
     cost: 0,
     rechargeMs: 0,
     summary: "Two Wall-nuts fused together, creating a barrier with 8,000 HP.",
+    blocksPoleVault: true,
     fusionOf: ["wallNut", "wallNut"],
   },
   chompNut: {
@@ -130,7 +143,7 @@ export const PLANT_SPECS: Record<PlantTypeKey, PlantSpec> = {
   },
   twinSunflower: {
     key: "twinSunflower", name: "Twin Sunflower", hp: 300, cost: 0, rechargeMs: 0,
-    summary: "A Sunflower fused with another Sunflower. It produces 50 and 75 sun every 30 seconds.",
+    summary: "A Sunflower fused with another Sunflower. It produces 125 sun every 30 seconds.",
     generateAmount: 50, generateMs: SUNFLOWER_GENERATION_MS, firstBurstMs: SUNFLOWER_FIRST_BURST_MS,
     fusionOf: ["sunflower", "sunflower"],
   },
@@ -158,9 +171,9 @@ export const PLANT_SPECS: Record<PlantTypeKey, PlantSpec> = {
   },
   chompShooter: {
     key: "chompShooter", name: "Chomp-shooter", hp: 300, cost: 0, rechargeMs: 0,
-    summary: "A Chomper fused with a Pea Shooter. After eating, it fires three 80-damage projectiles before eating again.",
-    damage: 40, shootMs: PEASHOOTER_SHOOT_MS, eatProjectileCount: 3, eatProjectileDamage: 80,
-    eatProjectileImage: "/plants/chomp-shooter-projectile.webp", fusionOf: ["peaShooter", "chomper"],
+    summary: "A Chomper fused with a Pea Shooter. It fires 20-damage peas while awake and eats nearby zombies.",
+    damage: 40, projectileDamage: 20, shootMs: PEASHOOTER_SHOOT_MS,
+    projectileImage: "/plants/chomp-shooter-projectile.webp", fusionOf: ["peaShooter", "chomper"],
   },
   cherryBomber: {
     key: "cherryBomber", name: "Cherry Bomber", hp: 300, cost: 0, rechargeMs: 0,
@@ -172,6 +185,23 @@ export const PLANT_SPECS: Record<PlantTypeKey, PlantSpec> = {
     key: "cherryChomper", name: "Cherry Chomper", hp: 300, cost: 0, rechargeMs: 0,
     summary: "A Chomper fused with a Cherry Bomb. Every zombie it eats triggers a 200-damage blast.",
     damage: 40, shootMs: PEASHOOTER_SHOOT_MS, eatExplosionDamage: 200, fusionOf: ["cherryBomb", "chomper"],
+  },
+  frozenCherry: {
+    key: "frozenCherry", name: "Frozen Cherry", hp: 1, cost: 0, rechargeMs: 0,
+    summary: "An Iceberg Lettuce fused with a Cherry Bomb. It explodes in a 3x3 area and freezes zombies.",
+    damage: 1000, freezeDurationMs: 5000, freezeOnContact: true, triggerExplosion: true,
+    fusionOf: ["cherryBomb", "icebergLettuce"],
+  },
+  snowPeashooter: {
+    key: "snowPeashooter", name: "Snow Peashooter", hp: 300, cost: 0, rechargeMs: 0,
+    summary: "An Iceberg Lettuce fused with a Pea Shooter. Its snow peas deal 20 damage and freeze zombies for 1 second.",
+    damage: 20, shootMs: PEASHOOTER_SHOOT_MS, projectileImage: "/plants/snow-pea-projectile.webp", freezeOnHit: true,
+    freezeDurationMs: 1000, fusionOf: ["peaShooter", "icebergLettuce"],
+  },
+  frostNut: {
+    key: "frostNut", name: "Frost-nut", hp: 4000, cost: 0, rechargeMs: 0,
+    summary: "An Iceberg Lettuce fused with a Wall-nut. Zombies that bite it are frozen for 5 seconds.",
+    freezeOnContact: true, freezeDurationMs: 5000, fusionOf: ["wallNut", "icebergLettuce"],
   },
 };
 
@@ -189,6 +219,9 @@ export const FUSION_RECIPES: Record<string, PlantTypeKey> = {
   "chomper+peaShooter": "chompShooter",
   "cherryBomb+peaShooter": "cherryBomber",
   "cherryBomb+chomper": "cherryChomper",
+  "cherryBomb+icebergLettuce": "frozenCherry",
+  "icebergLettuce+peaShooter": "snowPeashooter",
+  "icebergLettuce+wallNut": "frostNut",
 };
 
 export interface ZombieSpec {
@@ -258,5 +291,25 @@ export const ZOMBIE_SPECS: Record<string, ZombieSpec> = {
     attackMs: 2000,
     damage: 2000,
     armor: 0,
+  },
+  wallNutZombie: {
+    key: "wallNutZombie", name: "Wall-nut Zombie", summary: "A zombie with a Wall-nut's resilience and 2,000 health.", coinDropChance: 0.01,
+    hp: 2000, moveMs: ZOMBIE_MOVE_MS, attackMs: ZOMBIE_ATTACK_MS, damage: 50, armor: 0,
+  },
+  peashooterZombie: {
+    key: "peashooterZombie", name: "Peashooter Zombie", summary: "A zombie that fires peas down its lane at plants.", coinDropChance: 0.01,
+    hp: ZOMBIE_HP, moveMs: ZOMBIE_MOVE_MS, attackMs: ZOMBIE_ATTACK_MS, damage: 50, armor: 0,
+  },
+  horseman: {
+    key: "horseman", name: "Zombie Horseman", summary: "A fast zombie that runs twice as quickly as a Basic Zombie.", coinDropChance: 0.01,
+    hp: 1200, moveMs: ZOMBIE_MOVE_MS / 2, attackMs: ZOMBIE_ATTACK_MS, damage: 50, armor: 0,
+  },
+  undyingWraith: {
+    key: "undyingWraith", name: "Undying Wraith", summary: "A ghostly zombie that passes through plants without attacking them.", coinDropChance: 0.01,
+    hp: ZOMBIE_HP, moveMs: ZOMBIE_MOVE_MS, attackMs: ZOMBIE_ATTACK_MS, damage: 50, armor: 0,
+  },
+  poleVaulting: {
+    key: "poleVaulting", name: "Pole Vaulting Zombie", summary: "Runs like an Imp, vaults over the first plant, then walks at Basic Zombie speed.", coinDropChance: 0.01,
+    hp: ZOMBIE_HP, moveMs: Math.round(ZOMBIE_MOVE_MS / 1.5), attackMs: ZOMBIE_ATTACK_MS, damage: 50, armor: 0,
   },
 };

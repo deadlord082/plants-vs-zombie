@@ -21,6 +21,7 @@ import {
   SUNFLOWER_ARC_HEIGHT_TILES,
   ZOMBIE_SPECS,
   CHERRY_BOMB_FUSE_MS,
+  ICEBERG_LETTUCE_FUSE_MS,
   CHOMPER_BITE_MS,
   CHOMPER_SLEEP_MS,
   BASE_PLANT_TYPES,
@@ -38,6 +39,8 @@ import type {
   SunInstance,
   ZombieInstance,
   LevelCategory,
+  StatueInstance,
+  ZombieProjectile,
 } from "./types";
 import { LEVELS } from "./levels";
 import { getTileDefinition, TILE_DEFINITIONS } from "./tiles";
@@ -52,6 +55,7 @@ const getPlantImage = (plantType: PlantTypeKey) => ({
   wallNut: "/plants/wall-nut.webp",
   chomper: "/plants/chomper.webp",
   cherryBomb: "/plants/cherry-bomb.webp",
+  icebergLettuce: "/plants/iceberg_lettuce.webp",
   peanut: "/plants/peanut.webp",
   sunNut: "/plants/sun-nut.webp",
   tallNut: "/plants/tall-nut.webp",
@@ -65,6 +69,9 @@ const getPlantImage = (plantType: PlantTypeKey) => ({
   chompShooter: "/plants/chomp-shooter.webp",
   cherryBomber: "/plants/cherry-bomber.webp",
   cherryChomper: "/plants/cherry-chomper.webp",
+  frozenCherry: "/plants/frozen-cherry.webp",
+  snowPeashooter: "/plants/snow-peashooter.webp",
+  frostNut: "/plants/frost-nut.webp",
 }[plantType]);
 
 const getNutDamageImage = (plantType: PlantTypeKey, stage: number) => {
@@ -75,6 +82,7 @@ const getNutDamageImage = (plantType: PlantTypeKey, stage: number) => {
     sunNut: ["/plants/sun-nut-damaged.webp", "/plants/sun-nut-heavenly-damaged.webp"],
     tallNut: ["/plants/tall-nut-damaged.webp", "/plants/tall-nut-heavely-damaged.webp"],
     explodeONut: ["/plants/explode-o-nut-damaged_1.webp", "/plants/explode-o-nut-heavely-damaged_1.webp"],
+    frostNut: ["/plants/frost-nut-damaged.webp", "/plants/frost-nut-heavely-damaged.webp"],
   };
   return damagedImages[plantType]?.[stage - 1] || getPlantImage(plantType);
 };
@@ -106,7 +114,15 @@ const getPlantInstance = (type: PlantTypeKey, row: number, col: number, now: num
 
 const getNutDamageStage = (hp: number) => hp <= 1000 ? 2 : hp <= 2500 ? 1 : 0;
 
-const getZombieImage = (zombieType: string) => zombieType === "imp" ? "/zombie/imp.webp" : zombieType === "gargantuar" ? "/zombie/gargantuar.webp" : "/zombie/zombie.webp";
+const getZombieImage = (zombieType: string) => ({
+  imp: "/zombie/imp.webp",
+  gargantuar: "/zombie/gargantuar.webp",
+  wallNutZombie: "/zombie/wall-nut-zombie.webp",
+  peashooterZombie: "/zombie/peashooter-zombie.webp",
+  horseman: "/zombie/zombie-horseman.webp",
+  undyingWraith: "/zombie/undying-wraith.webp",
+  poleVaulting: "/zombie/pole-vaulting-zombie.webp",
+}[zombieType] || "/zombie/zombie.webp");
 
 const getZombieArmorImage = (zombieType: string, armor: number, armorBrokenAt?: number, now = Date.now()) => {
   const armorSpec = zombieType === "cone"
@@ -122,13 +138,11 @@ const getZombieArmorImage = (zombieType: string, armor: number, armorBrokenAt?: 
 
 const getZombieLabel = (zombieType: string) => zombieType === "basic"
   ? "Basic zombie"
-  : zombieType === "imp"
-    ? "Imp"
     : zombieType === "cone"
       ? "Conehead zombie"
       : zombieType === "bucket"
         ? "Buckethead zombie"
-        : "Gargantuar";
+          : ZOMBIE_SPECS[zombieType]?.name || zombieType;
 
 const applyZombieDamage = (zombie: ZombieInstance, damage: number, now: number): ZombieInstance => {
   const armorDamage = Math.min(zombie.armor, damage);
@@ -143,12 +157,15 @@ const applyZombieDamage = (zombie: ZombieInstance, damage: number, now: number):
 
 const getGridRows = (level: LevelConfig | null) => level?.tiles.length || 0;
 const getGridCols = (level: LevelConfig | null) => level?.tiles[0]?.length || 0;
-const INITIAL_SEED_BANK_SIZE = 6;
+const INITIAL_SEED_BANK_SIZE = 5;
 const SEED_SLOT_COSTS = [50000, 80000];
 const COIN_LIFETIME_MS = 15000;
+const INTRO_TEXT_DURATION_MS = 4000;
 const PLAYER_DATA_STORAGE_KEY = "plants-vs-zombie-player";
+const MUSIC_SETTINGS_STORAGE_KEY = "plants-vs-zombie-music-volume";
 const DEFAULT_PLAYER_DATA: PlayerData = {
   money: 0,
+  zombieKills: {},
   unlockedPlants: ["peaShooter"],
   completedLevels: [],
   seedBankSize: INITIAL_SEED_BANK_SIZE,
@@ -182,6 +199,7 @@ const LEVEL_CATEGORIES: Array<{ key: LevelCategory; name: string; description: s
 
 interface PlayerData {
   money: number;
+  zombieKills: Record<string, number>;
   unlockedPlants: BasePlantTypeKey[];
   completedLevels: number[];
   seedBankSize: number;
@@ -207,6 +225,9 @@ export default function GameScreen() {
   const [gloveReadyAt, setGloveReadyAt] = useState(0);
   const [toolCursorPosition, setToolCursorPosition] = useState<ToolCursorPosition | null>(null);
   const [isPaused, setIsPaused] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const [musicVolume, setMusicVolume] = useState(0.5);
+  const [musicSettingsLoaded, setMusicSettingsLoaded] = useState(false);
   const [currentLevel, setCurrentLevel] = useState<LevelConfig | null>(null);
   const [sun, setSun] = useState(INITIAL_SUN);
   const [plants, setPlants] = useState<PlantInstance[]>([]);
@@ -214,20 +235,25 @@ export default function GameScreen() {
   const [projectiles, setProjectiles] = useState<Projectile[]>([]);
   const [suns, setSuns] = useState<SunInstance[]>([]);
   const [coins, setCoins] = useState<CoinInstance[]>([]);
+  const [statues, setStatues] = useState<StatueInstance[]>([]);
+  const [zombieProjectiles, setZombieProjectiles] = useState<ZombieProjectile[]>([]);
   const [regularSpawned, setRegularSpawned] = useState(0);
   const [wave1Spawned, setWave1Spawned] = useState(0);
   const [wave2Spawned, setWave2Spawned] = useState(0);
   const [spawnedZombieCount, setSpawnedZombieCount] = useState(0);
   const [waveActive, setWaveActive] = useState(false);
+  const [showBossWaveWarning, setShowBossWaveWarning] = useState(false);
   const [plantReady, setPlantReady] = useState<Record<BasePlantTypeKey, number>>({
     sunflower: 0,
     peaShooter: 0,
     wallNut: 0,
     chomper: 0,
     cherryBomb: 0,
+    icebergLettuce: 0,
   });
   const [gameTime, setGameTime] = useState(Date.now());
   const [gameOver, setGameOver] = useState(false);
+  const [introTextIndex, setIntroTextIndex] = useState<number | null>(null);
   const [showDebugHealth, setShowDebugHealth] = useState(false);
   const [playerData, setPlayerData] = useState<PlayerData>(DEFAULT_PLAYER_DATA);
   const [playerDataLoaded, setPlayerDataLoaded] = useState(false);
@@ -241,6 +267,8 @@ export default function GameScreen() {
   const projectilesRef = useRef<Projectile[]>([]);
   const sunsRef = useRef<SunInstance[]>([]);
   const coinsRef = useRef<CoinInstance[]>([]);
+  const statuesRef = useRef<StatueInstance[]>([]);
+  const zombieProjectilesRef = useRef<ZombieProjectile[]>([]);
   const sunRef = useRef(INITIAL_SUN);
   const regularSpawnedRef = useRef(0);
   const wave1SpawnedRef = useRef(0);
@@ -253,6 +281,7 @@ export default function GameScreen() {
     wallNut: 0,
     chomper: 0,
     cherryBomb: 0,
+    icebergLettuce: 0,
   });
   const currentLevelRef = useRef<LevelConfig | null>(null);
   const compiledLevelRef = useRef<ReturnType<typeof getCompiledLevel> | null>(null);
@@ -264,13 +293,74 @@ export default function GameScreen() {
     nextWaveNumber: 1,
     batchIndex: 0,
   });
+  const bossWarningBatchRef = useRef(-1);
+  const bossWarningUntilRef = useRef(0);
   const nextSkySunAtRef = useRef(0);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const playerDataRef = useRef<PlayerData>(DEFAULT_PLAYER_DATA);
   const completionHandledRef = useRef(false);
   const defeatedZombieIdsRef = useRef(new Set<string>());
-  const regularBatchHealthRef = useRef<{ zombieIds: Set<string>; initialHealth: number } | null>(null);
+  const regularBatchHealthRef = useRef<{ zombieIds: Set<string>; initialHealth: number; isBoss: boolean } | null>(null);
   const suppressNextTileClickRef = useRef(false);
+  const musicAudioRef = useRef<HTMLAudioElement | null>(null);
+  const musicRestartTimerRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    const timeout = window.setTimeout(() => {
+      const storedValue = window.localStorage.getItem(MUSIC_SETTINGS_STORAGE_KEY);
+      const storedVolume = storedValue === null ? null : Number(storedValue);
+      if (storedVolume !== null && Number.isFinite(storedVolume)) {
+        setMusicVolume(Math.min(1, Math.max(0, Math.round(storedVolume * 10) / 10)));
+      }
+      setMusicSettingsLoaded(true);
+    }, 0);
+    return () => window.clearTimeout(timeout);
+  }, []);
+
+  useEffect(() => {
+    if (musicSettingsLoaded) {
+      window.localStorage.setItem(MUSIC_SETTINGS_STORAGE_KEY, String(musicVolume));
+    }
+  }, [musicVolume, musicSettingsLoaded]);
+
+  useEffect(() => {
+    const musicTrack = currentLevel?.musicTrack;
+    if (!musicTrack || (phase !== "playing" && phase !== "complete")) return;
+
+    const audio = new Audio(musicTrack);
+    audio.addEventListener("ended", () => {
+      musicRestartTimerRef.current = window.setTimeout(() => {
+        audio.currentTime = 0;
+        void audio.play().catch(() => undefined);
+      }, 1000);
+    });
+    musicAudioRef.current = audio;
+    void audio.play().catch(() => undefined);
+
+    return () => {
+      if (musicRestartTimerRef.current !== null) window.clearTimeout(musicRestartTimerRef.current);
+      musicRestartTimerRef.current = null;
+      audio.pause();
+      audio.removeAttribute("src");
+      musicAudioRef.current = null;
+    };
+  }, [currentLevel?.musicTrack, phase]);
+
+  useEffect(() => {
+    if (musicAudioRef.current) musicAudioRef.current.volume = musicVolume;
+  }, [musicVolume]);
+
+  useEffect(() => {
+    const audio = musicAudioRef.current;
+    if (!audio) return;
+    if (isPaused) {
+      audio.pause();
+      if (musicRestartTimerRef.current !== null) window.clearTimeout(musicRestartTimerRef.current);
+      musicRestartTimerRef.current = null;
+    } else if (phase === "playing" || phase === "complete") {
+      void audio.play().catch(() => undefined);
+    }
+  }, [isPaused, phase]);
 
   useEffect(() => {
     try {
@@ -278,22 +368,26 @@ export default function GameScreen() {
       if (stored) {
         const parsed = JSON.parse(stored) as Partial<PlayerData>;
         const storedMoney = typeof parsed.money === "number" ? parsed.money : 0;
-        const storedSeedBankSize = typeof parsed.seedBankSize === "number" ? parsed.seedBankSize : INITIAL_SEED_BANK_SIZE;
         const storedSeedSlotsPurchased = typeof parsed.seedSlotsPurchased === "number"
           ? parsed.seedSlotsPurchased
-          : storedSeedBankSize - INITIAL_SEED_BANK_SIZE;
+          : typeof parsed.seedBankSize === "number" ? parsed.seedBankSize - INITIAL_SEED_BANK_SIZE : 0;
+        const seedSlotsPurchased = Math.min(2, Math.max(0, Number.isInteger(storedSeedSlotsPurchased) ? storedSeedSlotsPurchased : 0));
+        const storedZombieKills = parsed.zombieKills && typeof parsed.zombieKills === "object" && !Array.isArray(parsed.zombieKills)
+          ? Object.fromEntries(Object.entries(parsed.zombieKills).filter(([type, count]) => type in ZOMBIE_SPECS && Number.isInteger(count) && count > 0))
+          : {};
         const unlockedPlants = Array.isArray(parsed.unlockedPlants)
           ? parsed.unlockedPlants.filter((key): key is BasePlantTypeKey =>
-            key === "peaShooter" || key === "sunflower" || key === "wallNut" || key === "chomper" || key === "cherryBomb")
+            key === "peaShooter" || key === "sunflower" || key === "wallNut" || key === "chomper" || key === "cherryBomb" || key === "icebergLettuce")
           : DEFAULT_PLAYER_DATA.unlockedPlants;
         const loadedData: PlayerData = {
           money: Number.isInteger(storedMoney) && storedMoney >= 0 ? storedMoney : 0,
+          zombieKills: storedZombieKills,
           unlockedPlants: Array.from(new Set(["peaShooter", ...unlockedPlants])) as BasePlantTypeKey[],
           completedLevels: Array.isArray(parsed.completedLevels)
             ? parsed.completedLevels.filter((levelId): levelId is number => Number.isInteger(levelId) && levelId >= 0)
             : [],
-          seedBankSize: INITIAL_SEED_BANK_SIZE + Math.min(2, Math.max(0, Number.isInteger(storedSeedSlotsPurchased) ? storedSeedSlotsPurchased : 0)),
-          seedSlotsPurchased: Math.min(2, Math.max(0, Number.isInteger(storedSeedSlotsPurchased) ? storedSeedSlotsPurchased : 0)),
+          seedBankSize: INITIAL_SEED_BANK_SIZE + seedSlotsPurchased,
+          seedSlotsPurchased,
           gloveUnlocked: parsed.gloveUnlocked === true,
         };
         playerDataRef.current = loadedData;
@@ -353,6 +447,10 @@ export default function GameScreen() {
     setProjectilesState([]);
     setSunsState([]);
     setCoinsState([]);
+    statuesRef.current = [];
+    setStatues([]);
+    zombieProjectilesRef.current = [];
+    setZombieProjectiles([]);
     setRegularSpawned(0);
     regularSpawnedRef.current = 0;
     setWave1Spawned(0);
@@ -363,7 +461,10 @@ export default function GameScreen() {
     spawnedZombieCountRef.current = 0;
     setWaveActive(false);
     waveActiveRef.current = false;
-    setPlantReadyState({ sunflower: 0, peaShooter: 0, wallNut: 0, chomper: 0, cherryBomb: 0 });
+    setShowBossWaveWarning(false);
+    bossWarningBatchRef.current = -1;
+    bossWarningUntilRef.current = 0;
+    setPlantReadyState({ sunflower: 0, peaShooter: 0, wallNut: 0, chomper: 0, cherryBomb: 0, icebergLettuce: 0 });
     setShovelSelected(false);
     setGloveSelected(false);
     setMovingPlantId(null);
@@ -376,6 +477,7 @@ export default function GameScreen() {
     setRewardlessTransition(false);
     setRewardlessReady(false);
     setGameOver(false);
+    setIntroTextIndex(null);
     gameOverRef.current = false;
     completionHandledRef.current = false;
     defeatedZombieIdsRef.current.clear();
@@ -393,6 +495,11 @@ export default function GameScreen() {
     setCurrentLevel(levelToStart);
     currentLevelRef.current = levelToStart;
     compiledLevelRef.current = compiledLevel;
+    const levelStatues = levelToStart.tiles.flatMap((tiles, row) => tiles
+      .map((tile, col) => tile === "sunflowerStatue" ? { id: createId(), row, col, hp: 1000 } : null)
+      .filter((statue): statue is StatueInstance => statue !== null));
+    statuesRef.current = levelStatues;
+    setStatues(levelStatues);
     spawnScheduleRef.current = {
       nextRegularSpawn: now,
       nextWaveStart: 0,
@@ -419,6 +526,7 @@ export default function GameScreen() {
     };
     nextSkySunAtRef.current = currentLevelRef.current.skySunIntervalMs ? now + currentLevelRef.current.skySunIntervalMs : 0;
     setGameTime(now);
+    setIntroTextIndex(currentLevelRef.current.introTexts?.length ? 0 : null);
     setPhase("playing");
   };
 
@@ -472,6 +580,10 @@ export default function GameScreen() {
   const finishLevel = (lastDefeatedZombie: ZombieInstance | null) => {
     if (!currentLevelRef.current || completionHandledRef.current) return;
     completionHandledRef.current = true;
+    setShovelSelected(false);
+    setGloveSelected(false);
+    setMovingPlantId(null);
+    setToolCursorPosition(null);
     const levelId = currentLevelRef.current.id;
     const alreadyCompleted = playerDataRef.current.completedLevels.includes(levelId);
     if (alreadyCompleted) {
@@ -576,6 +688,7 @@ export default function GameScreen() {
   const handlePlacePlant = (row: number, col: number) => {
     if (phase !== "playing") return;
     const existingPlant = plantsRef.current.find((plant) => plant.row === row && plant.col === col);
+    if (statuesRef.current.some((statue) => statue.row === row && statue.col === col)) return;
     if (shovelSelected) {
       if (existingPlant) {
         setPlantsState(plantsRef.current.filter((plant) => plant.id !== existingPlant.id));
@@ -686,12 +799,13 @@ export default function GameScreen() {
       isWave,
       spawnedAt: now,
       type,
+      nextShotAt: type === "peashooterZombie" ? now + PEASHOOTER_SHOOT_MS : undefined,
     };
     return newZombie;
   };
 
   useEffect(() => {
-    if (phase !== "playing" || gameOver || isPaused) {
+    if (phase !== "playing" || gameOver || isPaused || introTextIndex !== null) {
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
         intervalRef.current = null;
@@ -708,21 +822,53 @@ export default function GameScreen() {
         clearInterval(intervalRef.current);
       }
     };
-  }, [phase, gameOver, isPaused]);
+  }, [phase, gameOver, isPaused, introTextIndex]);
+
+  useEffect(() => {
+    if (phase !== "playing" || isPaused || introTextIndex === null || currentLevel === null) return;
+
+    const timeout = window.setTimeout(() => {
+      setIntroTextIndex((index) => {
+        if (index === null || !currentLevelRef.current?.introTexts || index + 1 >= currentLevelRef.current.introTexts.length) return null;
+        return index + 1;
+      });
+    }, INTRO_TEXT_DURATION_MS);
+
+    return () => window.clearTimeout(timeout);
+  }, [phase, isPaused, introTextIndex, currentLevel]);
 
   useEffect(() => {
     const handleDebugKey = (event: KeyboardEvent) => {
+      if (event.repeat) return;
+      const target = event.target;
+      if (target instanceof HTMLElement && ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName)) return;
+
       if (event.key.toLowerCase() === "h" && !event.repeat) {
         setShowDebugHealth((visible) => !visible);
+      }
+      if (phase !== "playing") return;
+      if (event.key === "Escape") {
+        setShowSettings(false);
+        setIsPaused((paused) => !paused);
+      } else if (event.key === "1") {
+        setShovelSelected(!shovelSelected);
+        setGloveSelected(false);
+        setMovingPlantId(null);
+        setToolCursorPosition(null);
+      } else if (event.key === "2" && playerData.gloveUnlocked && Date.now() >= gloveReadyAt) {
+        setGloveSelected(!gloveSelected);
+        setShovelSelected(false);
+        setMovingPlantId(null);
+        setToolCursorPosition(null);
       }
     };
 
     window.addEventListener("keydown", handleDebugKey);
     return () => window.removeEventListener("keydown", handleDebugKey);
-  }, []);
+  }, [phase, shovelSelected, gloveSelected, playerData.gloveUnlocked, gloveReadyAt]);
 
   useEffect(() => {
-    if (phase !== "playing" || currentLevel === null || isPaused) return;
+    if (phase !== "playing" || currentLevel === null || isPaused || introTextIndex !== null) return;
 
     const now = gameTime;
     const gridCols = getGridCols(currentLevel);
@@ -730,6 +876,7 @@ export default function GameScreen() {
     let nextPlants = plantsRef.current.slice();
     let nextZombies = zombiesRef.current.slice();
     let nextProjectiles = projectilesRef.current.slice();
+    let nextZombieProjectiles = zombieProjectilesRef.current.slice();
     let nextSuns = sunsRef.current
       .filter((sun) => sun.expiresAt > now)
       .map((sun) => {
@@ -821,34 +968,55 @@ export default function GameScreen() {
 
     const compiledLevel = compiledLevelRef.current;
     const nextWave = compiledLevel?.spawnWaves[spawnState.batchIndex];
-    const regularBatchHealth = regularBatchHealthRef.current;
-    const regularBatchBelowHalf = regularBatchHealth
+    const previousWaveHealth = regularBatchHealthRef.current;
+    const previousWaveRemainingHealth = previousWaveHealth
       ? nextZombies
-        .filter((zombie) => regularBatchHealth.zombieIds.has(zombie.id))
-        .reduce((total, zombie) => total + zombie.hp, 0) <= regularBatchHealth.initialHealth * 0.5
-      : false;
+        .filter((zombie) => previousWaveHealth.zombieIds.has(zombie.id))
+        .reduce((total, zombie) => total + zombie.hp + (previousWaveHealth.isBoss ? zombie.armor : 0), 0)
+      : 0;
+    const previousWaveHealthThreshold = previousWaveHealth?.isBoss ? 0.25 : 0.5;
+    const previousWaveHealthThresholdReached = Boolean(previousWaveHealth
+      && previousWaveRemainingHealth <= previousWaveHealth.initialHealth * previousWaveHealthThreshold);
 
-    const canStartRegularWave = nextWave && !nextWave.isBoss && (now >= spawnState.nextRegularSpawn || regularBatchBelowHalf);
-    const canStartBossWave = nextWave?.isBoss && spawnState.nextWaveStart > 0 && now >= spawnState.nextWaveStart;
-    if (!waveActiveRef.current && (canStartRegularWave || canStartBossWave)) {
+    const canStartRegularWave = Boolean(nextWave && !nextWave.isBoss && (
+      previousWaveHealth?.isBoss
+        ? now >= spawnState.nextRegularSpawn && previousWaveHealthThresholdReached
+        : now >= spawnState.nextRegularSpawn || previousWaveHealthThresholdReached
+    ));
+    const lawnCleared = !nextZombies.some((zombie) => zombie.hp > 0);
+    let canStartBossWave = Boolean(nextWave?.isBoss && lawnCleared);
+    if (canStartBossWave && nextWave?.isBoss) {
+      if (bossWarningBatchRef.current !== spawnState.batchIndex) {
+        bossWarningBatchRef.current = spawnState.batchIndex;
+        bossWarningUntilRef.current = now + 3000;
+        setShowBossWaveWarning(true);
+      }
+      if (now < bossWarningUntilRef.current) {
+        canStartBossWave = false;
+      } else {
+        setShowBossWaveWarning(false);
+      }
+    }
+    if (!waveActiveRef.current && nextWave && (canStartRegularWave || canStartBossWave)) {
+      setShowBossWaveWarning(false);
       waveActiveRef.current = true;
       setWaveActive(true);
       spawnState.nextWaveSpawn = now;
       spawnState.nextWaveNumber = 0;
-      if (!nextWave.isBoss) {
-        regularBatchHealthRef.current = { zombieIds: new Set<string>(), initialHealth: 0 };
-      }
+      regularBatchHealthRef.current = { zombieIds: new Set<string>(), initialHealth: 0, isBoss: nextWave.isBoss };
     }
 
     if (waveActiveRef.current && nextWave && now >= spawnState.nextWaveSpawn) {
       const zombieSpawn = nextWave.zombies[spawnState.nextWaveNumber];
       const newZ = spawnZombie(nextWave.isBoss, zombieSpawn?.type || "basic");
       nextZombies.push(newZ);
-      if (!nextWave.isBoss && regularBatchHealthRef.current) {
+      if (regularBatchHealthRef.current) {
         regularBatchHealthRef.current.zombieIds.add(newZ.id);
-        regularBatchHealthRef.current.initialHealth += newZ.hp;
-        regularSpawnedRef.current += 1;
-        setRegularSpawned(regularSpawnedRef.current);
+        regularBatchHealthRef.current.initialHealth += newZ.hp + (nextWave.isBoss ? newZ.armor : 0);
+        if (!nextWave.isBoss) {
+          regularSpawnedRef.current += 1;
+          setRegularSpawned(regularSpawnedRef.current);
+        }
       }
       spawnState.nextWaveNumber += 1;
       spawnedZombieCountRef.current += 1;
@@ -861,14 +1029,12 @@ export default function GameScreen() {
         spawnState.nextWaveStart = 0;
         if (compiledLevel?.spawnWaves[spawnState.batchIndex]) {
           const followingWave = compiledLevel.spawnWaves[spawnState.batchIndex];
+          const nextWaveDelay = Math.max(regularInterval, betweenDelay);
           if (followingWave.isBoss) {
-            spawnState.nextWaveStart = now + betweenDelay;
+            spawnState.nextWaveStart = now + nextWaveDelay;
           } else {
-            spawnState.nextRegularSpawn = now + (nextWave.isBoss ? betweenDelay : regularInterval);
+            spawnState.nextRegularSpawn = now + nextWaveDelay;
           }
-        }
-        if (nextWave.isBoss) {
-          regularBatchHealthRef.current = null;
         }
       } else {
         spawnState.nextWaveSpawn = now + waveInterval;
@@ -876,7 +1042,7 @@ export default function GameScreen() {
     }
 
     const explodingCherryBombs = nextPlants.filter(
-      (plant) => (plant.type === "cherryBomb" || plant.type === "sunBomb") && plant.cherryBombExplodesAt && now >= plant.cherryBombExplodesAt,
+      (plant) => (plant.type === "cherryBomb" || plant.type === "sunBomb" || plant.type === "icebergLettuce" || plant.type === "frozenCherry") && plant.cherryBombExplodesAt && now >= plant.cherryBombExplodesAt,
     );
     const getZombieImage = (zombieType: string) => zombieType === "imp" ? "/zombie/imp.webp" : zombieType === "gargantuar" ? "/zombie/gargantuar.webp" : "/zombie/zombie.webp";
     const getZombieArmorImage = (zombieType: string, armor: number, armorBrokenAt?: number, now = Date.now()) => {
@@ -915,10 +1081,25 @@ export default function GameScreen() {
         ? { ...damaged, sunOnKill }
         : damaged;
     };
+    const damageStatuesInArea = (centerRow: number, centerCol: number, radius: number, damage: number) => {
+      const nextStatues = statuesRef.current
+        .map((statue) => Math.abs(statue.row - centerRow) <= radius && Math.abs(statue.col - centerCol) <= radius
+          ? { ...statue, hp: statue.hp - damage }
+          : statue)
+        .filter((statue) => statue.hp > 0);
+      statuesRef.current = nextStatues;
+      setStatues(nextStatues);
+    };
     for (const cherryBomb of explodingCherryBombs) {
+      const blastRadius = cherryBomb.type === "icebergLettuce" ? 0 : 1;
+      const blastDamage = cherryBomb.type === "cherryBomb" || cherryBomb.type === "sunBomb" || cherryBomb.type === "frozenCherry" ? 1000 : 0;
+      damageStatuesInArea(cherryBomb.row, cherryBomb.col, blastRadius, blastDamage);
       nextZombies = nextZombies.map((zombie) => {
-        const inBlast = Math.abs(zombie.row - cherryBomb.row) <= 1 && Math.abs(Math.floor(zombie.x) - cherryBomb.col) <= 1;
-        return inBlast ? markDamage(zombie, 1000, cherryBomb.type === "sunBomb" ? 25 : 0) : zombie;
+        const inBlast = Math.abs(zombie.row - cherryBomb.row) <= blastRadius && Math.abs(Math.floor(zombie.x) - cherryBomb.col) <= blastRadius;
+        const damaged = inBlast ? markDamage(zombie, blastDamage, cherryBomb.type === "sunBomb" ? 25 : 0) : zombie;
+        return inBlast && (cherryBomb.type === "icebergLettuce" || cherryBomb.type === "frozenCherry")
+          ? { ...damaged, frozenUntil: Math.max(damaged.frozenUntil || 0, now + (PLANT_SPECS[cherryBomb.type].freezeDurationMs || 5000)) }
+          : damaged;
       });
     }
     if (explodingCherryBombs.length > 0) {
@@ -928,6 +1109,10 @@ export default function GameScreen() {
 
     nextPlants = nextPlants.map((plant) => {
       const plantSpec = PLANT_SPECS[plant.type];
+      const touchingZombie = nextZombies.some((zombie) => zombie.type !== "undyingWraith" && zombie.hp > 0 && zombie.row === plant.row && Math.floor(zombie.x) === plant.col);
+      if (touchingZombie && plantSpec.triggerExplosion && !plant.cherryBombExplodesAt) {
+        return { ...plant, cherryBombExplodesAt: now + (plant.type === "icebergLettuce" || plant.type === "frozenCherry" ? ICEBERG_LETTUCE_FUSE_MS : CHERRY_BOMB_FUSE_MS) };
+      }
       if ((plantSpec.generateMs && plant.nextSunAt && now >= plant.nextSunAt)
         && ["sunflower", "sunNut", "twinSunflower", "sunshooter"].includes(plant.type)) {
         const startY = plant.row - 0.35;
@@ -955,29 +1140,31 @@ export default function GameScreen() {
           risingFrom: now,
           risingUntil: now,
           fallingUntil: now + arcDurationMs,
-          value: plant.type === "twinSunflower" ? (plant.nextSunValue || 50) : (plantSpec.generateAmount || 50),
+          value: plant.type === "twinSunflower" ? 125 : (plantSpec.generateAmount || 50),
           expiresAt: now + SUN_LIFETIME_MS,
         });
         const interval = plant.sunIntervalMs || (plantSpec.generateMs || SUNFLOWER_GENERATION_MS);
         return {
           ...plant,
           nextSunAt: plant.nextSunAt + interval,
-          nextSunValue: plant.type === "twinSunflower" ? (plant.nextSunValue === 50 ? 75 : 50) : plant.nextSunValue,
+          nextSunValue: plant.nextSunValue,
         };
       }
 
-      const canShoot = ["peaShooter", "peanut", "sunshooter", "repeater", "cherryBomber"].includes(plant.type);
+      const canShoot = ["peaShooter", "peanut", "sunshooter", "repeater", "cherryBomber", "snowPeashooter", "chompShooter"].includes(plant.type)
+        && !(plant.type === "chompShooter" && plant.sleepingUntil && now < plant.sleepingUntil);
       if (canShoot && plant.nextShotAt && now >= plant.nextShotAt) {
         // Only shoot if there's at least one zombie ahead in the same row AND within grid bounds
-        const anyAhead = zombiesRef.current.some(
+        const anyAhead = nextZombies.some(
           (z) => z.row === plant.row && z.x > plant.col && z.x >= 0 && z.x < gridCols && z.hp > 0
-        );
+        ) || statuesRef.current.some((statue) => statue.row === plant.row && statue.col > plant.col);
         if (anyAhead) {
           const shots = Array.from({ length: plantSpec.shotsPerBurst || 1 }, (_, index): Projectile => ({
             id: createId(), row: plant.row, x: plant.col + 0.5,
-            damage: plantSpec.damage || 20, pierces: plantSpec.pierces === true,
+            damage: plantSpec.projectileDamage || plantSpec.damage || 20, pierces: plantSpec.pierces === true,
             image: plantSpec.projectileImage, blastDamage: plantSpec.projectileBlastDamage,
             blastRadius: plantSpec.projectileBlastRadius, launchAt: now + index * (plantSpec.shotDelayMs || 0),
+            freezeDurationMs: plantSpec.freezeOnHit ? plantSpec.freezeDurationMs : undefined,
           }));
           nextProjectiles = [...nextProjectiles, ...shots];
         }
@@ -1016,6 +1203,7 @@ export default function GameScreen() {
             nextSuns.push({ id: createId(), row: plant.row, x: plant.col + 0.5, y: plant.row + 0.25, value: plantSpec.bonusSunOnEat, expiresAt: now + SUN_LIFETIME_MS });
           }
           if (plantSpec.eatExplosionDamage) {
+            damageStatuesInArea(plant.row, plant.col, 1, plantSpec.eatExplosionDamage);
             nextZombies = nextZombies.map((zombie) => {
               const inBlast = Math.abs(zombie.row - plant.row) <= 1 && Math.abs(Math.floor(zombie.x) - plant.col) <= 1;
               return inBlast ? applyZombieDamage(zombie, plantSpec.eatExplosionDamage || 200, now) : zombie;
@@ -1026,6 +1214,7 @@ export default function GameScreen() {
             hp: Math.min(plantSpec.hp, plant.hp + (plantSpec.regeneration || 0)),
             sleepingUntil: now + CHOMPER_SLEEP_MS,
             lastContactAt: now,
+            nextShotAt: plant.type === "chompShooter" ? now + CHOMPER_SLEEP_MS : plant.nextShotAt,
             pendingShots: plantSpec.eatProjectileCount || plant.pendingShots,
             nextPendingShotAt: plantSpec.eatProjectileCount ? now + CHOMPER_SLEEP_MS : plant.nextPendingShotAt,
           };
@@ -1041,6 +1230,47 @@ export default function GameScreen() {
     });
 
     nextPlants = nextPlants.filter((plant) => plant.hp > 0);
+    nextZombieProjectiles = nextZombieProjectiles.reduce<ZombieProjectile[]>((acc, projectile) => {
+      const hitStatue = statuesRef.current
+        .filter((item) => item.row === projectile.row && projectile.x <= item.col + 0.8 && projectile.x >= item.col - 0.3)
+        .sort((a, b) => b.col - a.col)[0];
+      if (hitStatue) {
+        const nextStatues = statuesRef.current
+          .map((item) => item.id === hitStatue.id ? { ...item, hp: item.hp - projectile.damage } : item)
+          .filter((item) => item.hp > 0);
+        statuesRef.current = nextStatues;
+        setStatues(nextStatues);
+        return acc;
+      }
+      const hitPlant = nextPlants
+        .filter((item) => item.row === projectile.row && projectile.x <= item.col + 0.5 && projectile.x >= item.col - 0.3)
+        .sort((a, b) => b.col - a.col)[0];
+      if (hitPlant) {
+        nextPlants = nextPlants.map((item) => item.id === hitPlant.id ? { ...item, hp: Math.max(0, item.hp - projectile.damage) } : item);
+        return acc;
+      }
+      const moved = { ...projectile, x: projectile.x - PROJECTILE_SPEED_PER_TICK };
+      const statue = statuesRef.current
+        .filter((item) => item.row === moved.row && moved.x <= item.col + 0.8 && moved.x >= item.col - 0.3)
+        .sort((a, b) => b.col - a.col)[0];
+      if (statue) {
+        const nextStatues = statuesRef.current
+          .map((item) => item.id === statue.id ? { ...item, hp: item.hp - moved.damage } : item)
+          .filter((item) => item.hp > 0);
+        statuesRef.current = nextStatues;
+        setStatues(nextStatues);
+        return acc;
+      }
+      const plant = nextPlants
+        .filter((item) => item.row === moved.row && moved.x <= item.col + 0.5 && moved.x >= item.col - 0.3)
+        .sort((a, b) => b.col - a.col)[0];
+      if (plant) {
+        nextPlants = nextPlants.map((item) => item.id === plant.id ? { ...item, hp: Math.max(0, item.hp - moved.damage) } : item);
+        return acc;
+      }
+      if (moved.x > -2) acc.push(moved);
+      return acc;
+    }, []);
 
     // Move projectiles forward but do not affect zombies (zombies don't interact with grid)
     nextProjectiles = nextProjectiles.reduce<Projectile[]>((acc, projectile) => {
@@ -1049,9 +1279,25 @@ export default function GameScreen() {
         return acc;
       }
       const moved = { ...projectile, x: projectile.x + PROJECTILE_SPEED_PER_TICK };
+      const blockingStatue = statuesRef.current
+        .filter((statue) => statue.row === moved.row && statue.col + 0.8 >= projectile.x && statue.col - 0.3 <= moved.x)
+        .sort((a, b) => a.col - b.col)[0];
+      if (blockingStatue) {
+        const blastDamage = moved.blastDamage || moved.damage;
+        const blastRadius = moved.blastRadius || 0;
+        damageStatuesInArea(blockingStatue.row, blockingStatue.col, blastRadius, blastDamage);
+        if (moved.blastDamage && moved.blastRadius) {
+          nextZombies = nextZombies.map((zombie) => {
+            const inBlast = Math.abs(zombie.row - blockingStatue.row) <= moved.blastRadius! && Math.abs(Math.floor(zombie.x) - blockingStatue.col) <= moved.blastRadius!;
+            const damaged = inBlast ? applyZombieDamage(zombie, moved.blastDamage!, now) : zombie;
+            return inBlast && moved.freezeDurationMs ? { ...damaged, frozenUntil: Math.max(damaged.frozenUntil || 0, now + moved.freezeDurationMs) } : damaged;
+          });
+        }
+        return acc;
+      }
       // detect hit against nearest zombie in same row
       const hitZombies = nextZombies
-        .filter((z) => z.row === moved.row && z.hp > 0 && moved.x >= z.x - 0.3 && !projectile.hitZombieIds?.includes(z.id))
+        .filter((z) => z.row === moved.row && z.hp > 0 && z.x + 0.3 >= projectile.x && z.x - 0.3 <= moved.x && !projectile.hitZombieIds?.includes(z.id))
         .sort((a, b) => a.x - b.x);
 
       if (hitZombies.length > 0) {
@@ -1059,10 +1305,15 @@ export default function GameScreen() {
           const blastCenter = hitZombies[0];
           nextZombies = nextZombies.map((z) => {
             const inBlast = Math.abs(z.row - blastCenter.row) <= moved.blastRadius! && Math.abs(Math.floor(z.x) - Math.floor(blastCenter.x)) <= moved.blastRadius!;
-            return inBlast ? applyZombieDamage(z, moved.blastDamage!, now) : z;
+            const damaged = inBlast ? applyZombieDamage(z, moved.blastDamage!, now) : z;
+            return inBlast && moved.freezeDurationMs ? { ...damaged, frozenUntil: Math.max(damaged.frozenUntil || 0, now + moved.freezeDurationMs) } : damaged;
           });
         } else {
-          nextZombies = nextZombies.map((z) => hitZombies.some((hit) => hit.id === z.id) ? applyZombieDamage(z, moved.damage, now) : z);
+          nextZombies = nextZombies.map((z) => {
+            if (!hitZombies.some((hit) => hit.id === z.id)) return z;
+            const damaged = applyZombieDamage(z, moved.damage, now);
+            return moved.freezeDurationMs ? { ...damaged, frozenUntil: Math.max(damaged.frozenUntil || 0, now + moved.freezeDurationMs) } : damaged;
+          });
         }
         if (!moved.pierces) return acc;
         const hitZombieIds = [...(moved.hitZombieIds || []), ...hitZombies.map((z) => z.id)];
@@ -1080,17 +1331,71 @@ export default function GameScreen() {
     // Move zombies smoothly leftward; do not interact with plants or projectiles
     const walkPeriodMs = 3000; // 1.5 second walking cycle
     nextZombies = nextZombies.map((zombie) => {
-      const plantIndex = nextPlants.findIndex((plant) => plant.row === zombie.row && Math.floor(zombie.x) === plant.col);
+      const zombieSpec = ZOMBIE_SPECS[zombie.type] || ZOMBIE_SPECS.basic;
+      if (zombie.poleVaultStartedAt !== undefined && zombie.poleVaultTargetX !== undefined && zombie.poleVaultingUntil) {
+        const progress = Math.min(1, (now - zombie.poleVaultStartedAt) / 2000);
+        if (progress >= 1) {
+          return {
+            ...zombie,
+            x: zombie.poleVaultTargetX,
+            poleVaultingUntil: undefined,
+            poleVaultStartedAt: undefined,
+            poleVaultStartX: undefined,
+            poleVaultTargetX: undefined,
+            contactStartedAt: undefined,
+          };
+        }
+        const startX = zombie.poleVaultStartX ?? zombie.x;
+        return {
+          ...zombie,
+          x: startX + (zombie.poleVaultTargetX - startX) * progress,
+          contactStartedAt: undefined,
+        };
+      }
+      if (zombie.type === "peashooterZombie" && zombie.nextShotAt && now >= zombie.nextShotAt) {
+        nextZombieProjectiles.push({ id: createId(), row: zombie.row, x: zombie.x, damage: 20 });
+        const shotInterval = zombie.frozenUntil && zombie.frozenUntil > now ? PEASHOOTER_SHOOT_MS * 2 : PEASHOOTER_SHOOT_MS;
+        zombie = { ...zombie, nextShotAt: zombie.nextShotAt + shotInterval };
+      }
+      const statue = statuesRef.current.find((item) => item.row === zombie.row && Math.floor(zombie.x) === item.col);
+      if (statue && zombie.hp > 0) {
+        const attackInterval = zombie.frozenUntil && zombie.frozenUntil > now ? zombieSpec.attackMs * 2 : zombieSpec.attackMs;
+        if (zombie.contactStartedAt === undefined) zombie = { ...zombie, contactStartedAt: now };
+        else if (now - zombie.contactStartedAt >= attackInterval && now - zombie.lastAttackAt >= attackInterval) {
+          const nextStatues = statuesRef.current.map((item) => item.id === statue.id ? { ...item, hp: item.hp - zombieSpec.damage } : item).filter((item) => item.hp > 0);
+          statuesRef.current = nextStatues;
+          setStatues(nextStatues);
+          zombie = { ...zombie, lastAttackAt: now };
+        }
+        return zombie;
+      }
+      const plantIndex = zombie.type === "undyingWraith" ? -1 : nextPlants.findIndex((plant) => plant.row === zombie.row && Math.floor(zombie.x) === plant.col);
       if (plantIndex >= 0 && zombie.hp > 0) {
+        if (zombie.type === "poleVaulting" && !zombie.poleVaulted) {
+          const plant = nextPlants[plantIndex];
+          if (!PLANT_SPECS[plant.type].blocksPoleVault) {
+            return {
+              ...zombie,
+              x: zombie.x,
+              poleVaulted: true,
+              poleVaultingUntil: now + 2000,
+              poleVaultStartedAt: now,
+              poleVaultStartX: zombie.x,
+              poleVaultTargetX: plant.col - 0.2,
+              contactStartedAt: undefined,
+            };
+          }
+        }
         // Establish contact first, then wait one attack interval before biting.
-        const zombieSpec = ZOMBIE_SPECS[zombie.type] || ZOMBIE_SPECS.basic;
+        const attackInterval = zombie.frozenUntil && zombie.frozenUntil > now ? zombieSpec.attackMs * 2 : zombieSpec.attackMs;
         if (zombie.contactStartedAt === undefined) {
           zombie = { ...zombie, contactStartedAt: now };
-        } else if (now - zombie.contactStartedAt >= zombieSpec.attackMs && now - zombie.lastAttackAt >= zombieSpec.attackMs) {
+        } else if (now - zombie.contactStartedAt >= attackInterval && now - zombie.lastAttackAt >= attackInterval) {
           const plant = nextPlants[plantIndex];
-          const nextHp = plant.type === "cherryBomb" ? plant.hp : Math.max(0, plant.hp - zombieSpec.damage);
+          const nextHp = PLANT_SPECS[plant.type].triggerExplosion || plant.type === "cherryBomb" ? plant.hp : Math.max(0, plant.hp - zombieSpec.damage);
           const stageChanged = plant.type === "explodeONut" && getNutDamageStage(plant.hp) !== getNutDamageStage(nextHp);
           nextPlants[plantIndex] = { ...plant, hp: nextHp };
+          if (PLANT_SPECS[plant.type].freezeOnContact) zombie = { ...zombie, frozenUntil: Math.max(zombie.frozenUntil || 0, now + (PLANT_SPECS[plant.type].freezeDurationMs || 5000)) };
           if (stageChanged) {
             nextZombies = nextZombies.map((target) => {
               const inBlast = Math.abs(target.row - plant.row) <= 1 && Math.abs(Math.floor(target.x) - plant.col) <= 1;
@@ -1104,7 +1409,7 @@ export default function GameScreen() {
         const plant = nextPlants[plantIndex];
         const spec = PLANT_SPECS[plant.type];
         const contactInterval = spec.shootMs || PEASHOOTER_SHOOT_MS;
-        if (!["chomper", "chompNut", "sunChomper", "chompShooter", "cherryChomper"].includes(plant.type) && spec.damage && now - (plant.lastContactAt || 0) >= contactInterval) {
+        if (!PLANT_SPECS[plant.type].triggerExplosion && plant.type !== "cherryBomb" && plant.type !== "sunBomb" && !["chomper", "chompNut", "sunChomper", "chompShooter", "cherryChomper"].includes(plant.type) && spec.damage && now - (plant.lastContactAt || 0) >= contactInterval) {
           zombie = applyZombieDamage(zombie, spec.damage, now);
           nextPlants[plantIndex] = { ...plant, lastContactAt: now };
         }
@@ -1114,8 +1419,8 @@ export default function GameScreen() {
 
       // Move continuously towards left with marching gait (sine wave speed variation)
       // Each zombie type has its own speed from spec
-      const zombieSpec = ZOMBIE_SPECS[zombie.type] || ZOMBIE_SPECS.basic;
-      const speedPerTick = GAME_TICK_MS / zombieSpec.moveMs; // tiles per tick
+      const moveInterval = zombie.frozenUntil && zombie.frozenUntil > now ? zombieSpec.moveMs * 2 : zombieSpec.moveMs;
+      const speedPerTick = GAME_TICK_MS / moveInterval; // tiles per tick
       const elapsedMs = now - zombie.spawnedAt;
       const phase = (elapsedMs / walkPeriodMs) * Math.PI * 2;
       const speedMultiplier = 1 + 0.9 * Math.sin(phase); // varies from 0.65 to 1.35
@@ -1128,6 +1433,13 @@ export default function GameScreen() {
       if (zombie.hp > 0 || defeatedZombieIdsRef.current.has(zombie.id)) return;
       defeatedZombieIdsRef.current.add(zombie.id);
       lastDefeatedZombie = zombie;
+      const zombieKills = {
+        ...playerDataRef.current.zombieKills,
+        [zombie.type]: (playerDataRef.current.zombieKills[zombie.type] || 0) + 1,
+      };
+      const nextPlayerData = { ...playerDataRef.current, zombieKills };
+      playerDataRef.current = nextPlayerData;
+      setPlayerData(nextPlayerData);
       if (zombie.sunOnKill) {
         nextSuns.push({
           id: createId(),
@@ -1162,6 +1474,8 @@ export default function GameScreen() {
       setZombiesState(nextZombies.filter((z) => z.hp > 0));
       setPlantsState(nextPlants);
       setProjectilesState(nextProjectiles);
+      zombieProjectilesRef.current = nextZombieProjectiles;
+      setZombieProjectiles(nextZombieProjectiles);
       setSunsState(nextSuns);
       setCoinsState(nextCoins);
       return;
@@ -1172,6 +1486,8 @@ export default function GameScreen() {
     setPlantsState(nextPlants);
     setZombiesState(nextZombies);
     setProjectilesState(nextProjectiles);
+    zombieProjectilesRef.current = nextZombieProjectiles;
+    setZombieProjectiles(nextZombieProjectiles);
     setSunsState(nextSuns);
     setCoinsState(nextCoins);
 
@@ -1183,7 +1499,7 @@ export default function GameScreen() {
     ) {
       finishLevel(lastDefeatedZombie);
     }
-  }, [gameTime, phase, currentLevel, isPaused]);
+  }, [gameTime, phase, currentLevel, isPaused, introTextIndex]);
 
   const grid = useMemo(
     () =>
@@ -1196,17 +1512,19 @@ export default function GameScreen() {
   const gridCols = getGridCols(currentLevel);
   const compiledCurrentLevel = currentLevel ? getCompiledLevel(currentLevel.id) : null;
 
-  const progressMax = currentLevel
-    ? compiledCurrentLevel?.totalZombieCount || 1
-    : 1;
   const zombiesSent = spawnedZombieCount;
-  const progressPercent = currentLevel ? Math.round((zombiesSent / progressMax) * 100) : 0;
-  const waveThresholds = compiledCurrentLevel
-    ? compiledCurrentLevel.spawnWaves.reduce<number[]>((thresholds, wave, index) => {
-      if (wave.isBoss && index > 0) thresholds.push(compiledCurrentLevel.spawnWaves.slice(0, index).reduce((total, previous) => total + previous.zombies.length, 0));
-      return thresholds;
-    }, [])
-    : [];
+  let zombiesBeforeWave = 0;
+  const waveProgressSegments = compiledCurrentLevel?.spawnWaves.map((wave) => {
+    const waveZombieCount = wave.zombies.length;
+    const spawnedInWave = Math.min(waveZombieCount, Math.max(0, zombiesSent - zombiesBeforeWave));
+    zombiesBeforeWave += waveZombieCount;
+    return {
+      isBoss: wave.isBoss,
+      progress: waveZombieCount ? (spawnedInWave / waveZombieCount) * 100 : 100,
+    };
+  }) || [];
+  const completedWaveCount = waveProgressSegments.filter((segment) => segment.progress >= 100).length;
+  const nextWaveProgressIndex = waveProgressSegments.findIndex((segment) => segment.progress < 100);
   const title =
     phase === "menu"
       ? "Plants vs. Zombies"
@@ -1225,10 +1543,11 @@ export default function GameScreen() {
                   : "Level";
   const waveStageLabel = (() => {
     if (!currentLevel) return "";
-    const nextWave = compiledCurrentLevel?.spawnWaves[spawnScheduleRef.current.batchIndex];
-    if (waveActive && nextWave?.isBoss) return "Boss wave in progress.";
-    if (nextWave?.isBoss) return "Preparing a boss wave...";
-    return nextWave ? "Regular zombies are marching." : "";
+    const nextWave = nextWaveProgressIndex >= 0 ? compiledCurrentLevel?.spawnWaves[nextWaveProgressIndex] : null;
+    if (!nextWave) return "All waves have spawned. Clear the remaining zombies.";
+    if (waveActive && nextWave.isBoss) return "Boss wave in progress.";
+    if (nextWave.isBoss) return "Boss wave approaching. Clear the lawn.";
+    return waveActive ? "Regular zombies are marching." : "Preparing the next wave.";
   })();
   const zombieTypes = compiledCurrentLevel
     ? Array.from(
@@ -1239,9 +1558,17 @@ export default function GameScreen() {
     )
     : [];
   const movingPlant = movingPlantId ? plants.find((plant) => plant.id === movingPlantId) : null;
+  const levelBackgroundStyle = currentLevel && phase !== "menu" && currentLevel.backgroundImage
+    ? {
+      backgroundImage: `linear-gradient(rgb(5 12 8 / 48%), rgb(5 12 8 / 48%)), url("${currentLevel.backgroundImage}")`,
+      backgroundPosition: "center",
+      backgroundSize: "cover",
+      backgroundAttachment: "fixed" as const,
+    }
+    : undefined;
 
   return (
-    <div className={`min-h-screen bg-slate-950 text-slate-100 px-4 py-8 sm:px-8 ${phase === "credits" ? "credits-mode" : ""}`}>
+    <div className={`min-h-screen bg-slate-950 text-slate-100 px-4 py-8 sm:px-8 ${phase === "credits" ? "credits-mode" : ""}`} style={levelBackgroundStyle}>
       <div className="mx-auto max-w-7xl">
         <h1 className="text-4xl font-bold tracking-tight text-lime-300">{title}</h1>
 
@@ -1324,14 +1651,14 @@ export default function GameScreen() {
 
         {phase === "shop" && (
           <div className="level-select-screen">
-            <div className="screen-heading"><div><p className="menu-kicker">Improve your defense</p><h2>Shop</h2><p>Spend your level rewards to expand your seed bank.</p></div><button type="button" onClick={() => setPhase("menu")} className="text-button">Back to menu</button></div>
+            <div className="screen-heading"><div><p className="menu-kicker">Improve your defense</p><h2>Shop</h2><p>Start with five base plant slots, then spend rewards to expand your seed bank.</p></div><button type="button" onClick={() => setPhase("menu")} className="text-button">Back to menu</button></div>
             <div className="level-card max-w-xl">
               <div className="level-card-number">+</div>
               <div className="level-card-content">
                 <div>
-                  <h2 className="text-2xl font-semibold text-white">New seed slot</h2>
-                  <p>Add one more plant to every loadout. Current capacity: {playerData.seedBankSize}.</p>
-                  <p className="mt-2 font-semibold text-amber-200">Price: ${SEED_SLOT_COSTS[playerData.seedSlotsPurchased] || "-"} | Balance: ${playerData.money}</p>
+                  <h2 className="text-2xl font-semibold text-white">Expand your seed bank</h2>
+                  <p>Start with five base plant slots. Two one-time upgrades are available.</p>
+                  <p className="mt-2 font-semibold text-amber-200">Price: ${SEED_SLOT_COSTS[playerData.seedSlotsPurchased] || "-"} | Balance: ${playerData.money} | Capacity: {playerData.seedBankSize}</p>
                 </div>
                 <button type="button" onClick={buySeedSlot} disabled={playerData.seedSlotsPurchased >= SEED_SLOT_COSTS.length || playerData.money < (SEED_SLOT_COSTS[playerData.seedSlotsPurchased] || Infinity)} className="menu-primary disabled:cursor-not-allowed disabled:opacity-50">
                   {playerData.seedSlotsPurchased >= SEED_SLOT_COSTS.length ? "All slots purchased" : "Buy slot"}
@@ -1356,7 +1683,8 @@ export default function GameScreen() {
                 <div className="almanac-fusion-heading"><button type="button" className="text-button" onClick={() => setAlmanacPlantKey(null)}>Back to plants</button><div><p className="almanac-type">Fusions</p><h3>{PLANT_SPECS[almanacPlantKey].name} combinations</h3></div></div>
                 {Object.values(PLANT_SPECS).filter((spec) => spec.fusionOf?.includes(almanacPlantKey as never)).map((spec) => <article key={spec.key} className="almanac-card"><div className="almanac-art plant-art"><img src={getPlantImage(spec.key)} alt="" /></div><div><p className="almanac-type">Fusion plant</p><h3>{spec.name}</h3><p>{spec.summary}</p><p className="almanac-recipe">Requires {spec.fusionOf?.map((key) => PLANT_SPECS[key].name).join(" + ")}</p><dl><div><dt>Health</dt><dd>{spec.hp} HP</dd></div>{spec.damage && <div><dt>Damage</dt><dd>{spec.damage}</dd></div>}</dl></div></article>)}
               </>}
-              {almanacCategory === "zombies" && Object.values(ZOMBIE_SPECS).map((spec) => <article key={spec.key} className="almanac-card"><div className="almanac-art zombie-art relative"><img src={getZombieImage(spec.key)} alt="" />{(spec.key === "cone" || spec.key === "bucket") && <img src={spec.key === "cone" ? "/zombie/cone.webp" : "/zombie/bucket.webp"} alt="" className="absolute object-contain" style={{ width: "33.333%", height: "33.333%", left: "40%", top: "18%", transform: "translateX(-50%)" }} />}</div><div><p className="almanac-type">Zombie</p><h3>{spec.name}</h3><p>{spec.summary}</p><dl><div><dt>Health</dt><dd>{spec.hp} HP</dd></div><div><dt>Speed</dt><dd>{Math.round(spec.moveMs / 100) / 10}s / tile</dd></div><div><dt>Damage</dt><dd>{spec.damage}</dd></div><div><dt>Attack</dt><dd>{spec.attackMs / 1000}s</dd></div><div><dt>Armor</dt><dd>{spec.armor}</dd></div></dl></div></article>)}
+              {almanacCategory === "zombies" && Object.values(ZOMBIE_SPECS).filter((spec) => (playerData.zombieKills[spec.key] || 0) > 0).map((spec) => <article key={spec.key} className="almanac-card"><div className="almanac-art zombie-art relative"><img src={getZombieImage(spec.key)} alt="" />{(spec.key === "cone" || spec.key === "bucket") && <img src={spec.key === "cone" ? "/zombie/cone.webp" : "/zombie/bucket.webp"} alt="" className="absolute object-contain" style={{ width: "33.333%", height: "33.333%", left: "40%", top: "18%", transform: "translateX(-50%)" }} />}</div><div><p className="almanac-type">Zombie</p><h3>{spec.name}</h3><p>{spec.summary}</p><dl><div><dt>Defeated</dt><dd>{playerData.zombieKills[spec.key]}</dd></div><div><dt>Health</dt><dd>{spec.hp} HP</dd></div><div><dt>Speed</dt><dd>{Math.round(spec.moveMs / 100) / 10}s / tile</dd></div><div><dt>Damage</dt><dd>{spec.damage}</dd></div><div><dt>Attack</dt><dd>{spec.attackMs / 1000}s</dd></div><div><dt>Armor</dt><dd>{spec.armor}</dd></div></dl></div></article>)}
+              {almanacCategory === "zombies" && !Object.values(ZOMBIE_SPECS).some((spec) => (playerData.zombieKills[spec.key] || 0) > 0) && <p className="almanac-empty">No zombies defeated yet.</p>}
               {almanacCategory === "tiles" && Object.values(TILE_DEFINITIONS).map((tile) => <article key={tile.key} className="almanac-card tile-card"><div className={`almanac-tile-swatch ${tile.key}`} /><div><p className="almanac-type">Tile</p><h3>{tile.key === "normalDark" ? "Dark lawn" : tile.key === "normal" ? "Lawn" : "Obstructed"}</h3><p>{tile.description}</p><dl><div><dt>Plantable</dt><dd>{tile.canPlant ? "Yes" : "No"}</dd></div><div><dt>Label</dt><dd>{tile.label || "None"}</dd></div></dl></div></article>)}
             </div>
           </div>
@@ -1426,9 +1754,9 @@ export default function GameScreen() {
                 })}
                 {Array.from({ length: Math.max(0, playerData.seedBankSize - selectedLoadout.length) }).map((_, index) => <div key={`empty-${index}`} className="seed-slot empty" aria-hidden="true" />)}
               </div>
-              <button type="button" aria-label="Select shovel" onClick={selectShovel} className={`shovel-button ${shovelSelected ? "selected" : ""}`}><img src="/other/shovel.webp" alt="" /></button>
-              {playerData.gloveUnlocked && <button type="button" aria-label="Select glove" onClick={selectGlove} disabled={gloveReadyAt > gameTime} className={`shovel-button glove-button ${gloveSelected ? "selected" : ""} ${gloveReadyAt > gameTime ? "unavailable" : ""}`}><img src="/other/glove.webp" alt="" />{gloveReadyAt > gameTime && <small>{Math.ceil((gloveReadyAt - gameTime) / 1000)}s</small>}</button>}
-              <button type="button" aria-label="Open pause menu" onClick={() => setIsPaused(true)} className="settings-button">⚙</button>
+              <button type="button" aria-label="Select shovel" aria-keyshortcuts="1" onClick={selectShovel} className={`shovel-button ${shovelSelected ? "selected" : ""}`}><img src="/other/shovel.webp" alt="" /><kbd className="shortcut-hint">1</kbd></button>
+              {playerData.gloveUnlocked && <button type="button" aria-label="Select glove" aria-keyshortcuts="2" onClick={selectGlove} disabled={gloveReadyAt > gameTime} className={`shovel-button glove-button ${gloveSelected ? "selected" : ""} ${gloveReadyAt > gameTime ? "unavailable" : ""}`}><img src="/other/glove.webp" alt="" /><kbd className="shortcut-hint">2</kbd>{gloveReadyAt > gameTime && <small>{Math.ceil((gloveReadyAt - gameTime) / 1000)}s</small>}</button>}
+              <button type="button" aria-label="Open pause menu" aria-keyshortcuts="Escape" onClick={() => setIsPaused(true)} className="settings-button">⚙<kbd className="shortcut-hint">Esc</kbd></button>
             </div>
 
             <div className="overflow-hidden rounded-3xl border border-slate-700 bg-slate-900/90 p-4 shadow-xl">
@@ -1442,7 +1770,10 @@ export default function GameScreen() {
               >
                 {grid.flat().map(({ row, col }) => {
                   const plant = plants.find((item) => item.row === row && item.col === col);
-                  const tile = getTileDefinition(currentLevel?.tiles[row]?.[col] || "normal");
+                  const statue = statues.find((item) => item.row === row && item.col === col);
+                  const isSleepingChomper = Boolean(plant && ["chomper", "chompNut", "sunChomper", "chompShooter", "cherryChomper"].includes(plant.type) && plant.sleepingUntil && plant.sleepingUntil > gameTime);
+                  const configuredTile = currentLevel?.tiles[row]?.[col] || "normal";
+                  const tile = getTileDefinition(statue ? "sunflowerStatue" : configuredTile);
 
                   return (
                     <button
@@ -1464,24 +1795,29 @@ export default function GameScreen() {
                       }}
                       data-lawn-row={row}
                       data-lawn-col={col}
-                      disabled={!tile.canPlant}
+                      disabled={!tile.canPlant || Boolean(statue)}
                       aria-label={tile.label || "Available lawn tile"}
                       className={`relative z-0 min-h-16 overflow-visible p-2 text-left transition ${tile.className}`}
                     >
-                      {tile.label && !plant && <span className="text-xs font-semibold uppercase tracking-wide text-stone-200">{tile.label}</span>}
+                      {statue && (
+                        <div className="absolute inset-0 z-10 pointer-events-none">
+                          <img src="/other/sunflower-statue.webp" alt="Sunflower statue" className="h-full w-full object-contain" />
+                          {showDebugHealth && <span className="absolute bottom-0 left-1/2 -translate-x-1/2 rounded bg-slate-950/80 px-1 text-[10px] text-white">HP: {statue.hp}</span>}
+                        </div>
+                      )}
                       {plant && (
                         <div className="plant-idle relative z-10 h-full w-full text-xs text-lime-200">
                           {(() => {
-                            const isNutPlant = ["wallNut", "peanut", "sunNut", "tallNut", "explodeONut"].includes(plant.type);
+                            const isNutPlant = ["wallNut", "peanut", "sunNut", "tallNut", "explodeONut", "frostNut"].includes(plant.type);
                             const nutStage = plant.type === "tallNut"
                               ? plant.hp <= 2000 ? 2 : plant.hp <= 4000 ? 1 : 0
                               : getNutDamageStage(plant.hp);
                             const wallNutImage = isNutPlant
                               ? getNutDamageImage(plant.type, nutStage)
                               : getPlantImage(plant.type);
-                            const isSleeping = (plant.type === "chomper" || plant.type === "chompNut") && plant.sleepingUntil && plant.sleepingUntil > gameTime;
-                            const cherryGrowth = (plant.type === "cherryBomb" || plant.type === "sunBomb") && plant.cherryBombExplodesAt
-                              ? Math.min(1, Math.max(0, 1 - (plant.cherryBombExplodesAt - gameTime) / CHERRY_BOMB_FUSE_MS))
+                            const plantFuse = plant.type === "icebergLettuce" || plant.type === "frozenCherry" ? ICEBERG_LETTUCE_FUSE_MS : CHERRY_BOMB_FUSE_MS;
+                            const cherryGrowth = (plant.type === "cherryBomb" || plant.type === "sunBomb" || plant.type === "icebergLettuce" || plant.type === "frozenCherry") && plant.cherryBombExplodesAt
+                              ? Math.min(1, Math.max(0, 1 - (plant.cherryBombExplodesAt - gameTime) / plantFuse))
                               : 0;
                             return (
                               <img
@@ -1489,10 +1825,10 @@ export default function GameScreen() {
                                 alt={PLANT_SPECS[plant.type].name}
                                 className="absolute inset-0 h-full w-full scale-125 object-contain"
                                 style={{
-                                  transform: plant.type === "cherryBomb" || plant.type === "sunBomb"
+                                  transform: plant.type === "cherryBomb" || plant.type === "sunBomb" || plant.type === "icebergLettuce" || plant.type === "frozenCherry"
                                     ? `scale(${0.75 + cherryGrowth * 0.35})`
-                                    : isSleeping ? "scale(1.05, 0.72)" : "scale(1.25)",
-                                  filter: isSleeping ? "brightness(0.58)" : undefined,
+                                    : isSleepingChomper ? "scale(1.05, 0.72)" : "scale(1.25)",
+                                  filter: isSleepingChomper ? "brightness(0.58)" : undefined,
                                   transition: `transform ${GAME_TICK_MS}ms ease-out, filter ${GAME_TICK_MS}ms ease-out`,
                                 }}
                                 onError={(event) => {
@@ -1503,6 +1839,7 @@ export default function GameScreen() {
                               />
                             );
                           })()}
+                          {isSleepingChomper && <span className="plant-sleeping-indicator" aria-label="Sleeping">Zzz</span>}
                           <div className="relative z-10 hidden h-full w-full flex-col justify-between border border-lime-500/20 bg-lime-500/10 p-2">
                             <span>{PLANT_SPECS[plant.type].name}</span>
                             {showDebugHealth && <span className="text-[11px] text-slate-200">HP: {plant.hp}</span>}
@@ -1513,6 +1850,12 @@ export default function GameScreen() {
                     </button>
                   );
                 })}
+
+                {introTextIndex !== null && currentLevel?.introTexts?.[introTextIndex] && (
+                  <div className="lawn-intro-overlay" role="status" aria-live="polite">
+                    <p>{currentLevel?.introTexts?.[introTextIndex]}</p>
+                  </div>
+                )}
 
                 {suns.map((sunDrop) => (
                   <button
@@ -1592,19 +1935,27 @@ export default function GameScreen() {
                 {zombies.map((z) => {
                   const armorImage = getZombieArmorImage(z.type, z.armor, z.armorBrokenAt, gameTime);
                   const armorIsFalling = Boolean(z.armorBrokenAt && gameTime - z.armorBrokenAt < 2000);
-                  const zombieImage = getZombieImage(z.type);
+                  const vaultProgress = z.poleVaultStartedAt !== undefined && z.poleVaultingUntil
+                    ? Math.min(1, Math.max(0, (gameTime - z.poleVaultStartedAt) / 2000))
+                    : 0;
+                  const vaultLift = 4 * 0.85 * vaultProgress * (1 - vaultProgress);
+                  const zombieImage = z.type === "poleVaulting" && z.poleVaulted
+                    ? "/zombie/pole_vaulting_zombie-2.webp"
+                    : z.type === "wallNutZombie"
+                      ? z.hp <= 700 ? "/zombie/wall-nut-zombie-heavely-damaged.webp" : z.hp <= 1300 ? "/zombie/wall-nut-zombie-damaged.webp" : getZombieImage(z.type)
+                      : getZombieImage(z.type);
                   return (
                     <div
                       key={z.id}
-                      className="absolute pointer-events-none"
+                      className={`absolute pointer-events-none ${z.frozenUntil && z.frozenUntil > gameTime ? "zombie-frozen" : ""}`}
                       style={{
                         left: `${(z.x / gridCols) * 100}%`,
-                        top: `${((z.row + 0.5) / gridRows) * 100}%`,
+                        top: `${((z.row + (z.type === "gargantuar" || z.type === "horseman" ? 0.05 : 0.5) - vaultLift) / gridRows) * 100}%`,
                         transform: "translate(-50%, -50%)",
                         transition: `left ${GAME_TICK_MS}ms linear, top ${GAME_TICK_MS}ms linear`,
                       }}
                     >
-                      <div className={`relative ${z.type === "gargantuar" ? "h-32 w-32" : z.type === "imp" ? "h-16 w-16" : "h-20 w-20"}`}>
+                      <div className={`relative ${z.type === "gargantuar" || z.type === "horseman" ? "h-32 w-32" : z.type === "poleVaulting" ? "h-28 w-28" : z.type === "imp" ? "h-16 w-16" : "h-20 w-20"}`}>
                         <img src={zombieImage} alt={getZombieLabel(z.type)} className="absolute inset-0 h-full w-full origin-bottom object-contain" />
                         {armorImage && <img src={armorImage} alt="" className={`absolute origin-bottom object-contain ${armorIsFalling ? "zombie-armor-falling" : ""}`} style={{ width: "45%", height: "45%", left: "38%", top: "-28%", transform: "translateX(-50%)" }} />}
                       </div>
@@ -1634,12 +1985,39 @@ export default function GameScreen() {
                     {/* <div className="h-2 w-2 rounded-full bg-cyan-300" /> */}
                   </div>
                 ))}
+
+                {zombieProjectiles.map((projectile) => (
+                  <div
+                    key={projectile.id}
+                    className="absolute pointer-events-none"
+                    style={{
+                      left: `${(projectile.x / gridCols) * 100}%`,
+                      top: `${((projectile.row + 0.3) / gridRows) * 100}%`,
+                      transform: "translate(-50%, -50%)",
+                      transition: `left ${GAME_TICK_MS}ms linear`,
+                    }}
+                  >
+                    <img src="/plants/projectile-pea.webp" alt="" className="block h-5 w-5 -scale-x-100 object-contain" />
+                  </div>
+                ))}
+
+                {showBossWaveWarning && (
+                  <div className="boss-wave-warning" aria-hidden="true">
+                    <img src="/other/wave-text.webp" alt="" />
+                  </div>
+                )}
               </div>
             </div>
 
-            <div className="wave-progress" aria-label={`Zombie progress: ${zombiesSent} of ${progressMax} sent`}>
-              <div className="wave-progress-label"><span>Zombie attack</span><span>{zombiesSent} / {progressMax}</span></div>
-              <div className="wave-progress-track"><div className="wave-progress-fill" style={{ width: `${Math.min(100, progressPercent)}%` }} />{waveThresholds.map((threshold, index) => <i key={`${threshold}-${index}`} style={{ left: `${Math.min(100, Math.round((threshold / progressMax) * 100))}%` }} />)}</div>
+            <div className="wave-progress" aria-label={`Wave progress: ${completedWaveCount} of ${waveProgressSegments.length} waves spawned`}>
+              <div className="wave-progress-label"><span>Wave progress</span><span>{completedWaveCount} / {waveProgressSegments.length} waves</span></div>
+              <div className="wave-progress-track">
+                {waveProgressSegments.map((segment, index) => (
+                  <div key={`wave-${index}`} className="wave-progress-segment" aria-label={`${segment.isBoss ? "Boss " : ""}wave ${index + 1}`}>
+                    <div className={`wave-progress-segment-fill ${segment.isBoss ? "boss" : ""}`} style={{ width: `${segment.progress}%` }} />
+                  </div>
+                ))}
+              </div>
               <p>{waveStageLabel}</p>
             </div>
           </div>
@@ -1650,9 +2028,32 @@ export default function GameScreen() {
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/60 px-4">
           <div className="pause-menu">
             <h2>Paused</h2>
-            <button type="button" onClick={() => setIsPaused(false)}>Resume</button>
+            <button type="button" onClick={() => { setShowSettings(false); setIsPaused(false); }}>Resume</button>
+            <button type="button" onClick={() => setShowSettings(true)}>Settings</button>
             <button type="button" onClick={() => currentLevelRef.current && startLevel(currentLevelRef.current.id)}>Restart level</button>
             <button type="button" onClick={returnToMenu}>Return to main menu</button>
+          </div>
+        </div>
+      )}
+
+      {isPaused && showSettings && phase === "playing" && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 px-4" role="dialog" aria-modal="true" aria-labelledby="settings-title">
+          <div className="pause-menu settings-menu">
+            <h2 id="settings-title">Settings</h2>
+            <label className="music-volume-control">
+              <span>Music volume</span>
+              <strong>{Math.round(musicVolume * 100)}%</strong>
+              <input
+                type="range"
+                min="0"
+                max="1"
+                step="0.1"
+                value={musicVolume}
+                aria-label="Music volume"
+                onChange={(event) => setMusicVolume(Number(event.currentTarget.value))}
+              />
+            </label>
+            <button type="button" onClick={() => setShowSettings(false)}>Back to pause menu</button>
           </div>
         </div>
       )}

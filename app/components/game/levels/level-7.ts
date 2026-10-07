@@ -5,6 +5,7 @@ export const LEVEL_7: LevelDefinition = {
     unlockAfterLevelId: 6,
     title: "Buckethead Arrival",
     description: "Buckethead zombies join the march. Chomper can help manage the pressure.",
+    introTexts: ["Chomper can eat zombies like breakfast, but it must swallow before eating again."],
     initialDelayMs: 20000,
     regularSpawnIntervalMs: 30000,
     betweenWaveDelayMs: 3000,

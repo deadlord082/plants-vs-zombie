@@ -5,6 +5,7 @@ export const LEVEL_2: LevelDefinition = {
   unlockAfterLevelId: 1,
   title: "Five-Lane Meadow",
   description: "Hold five lanes as basic zombies arrive in larger groups.",
+  introTexts: ["The lawn has gained two more lanes. Use your plants strategically."],
   initialDelayMs: 20000,
   regularSpawnIntervalMs: 30000,
   betweenWaveDelayMs: 3000,

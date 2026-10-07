@@ -1,5 +1,5 @@
 import type { LevelConfig } from "../types";
-import type { CompiledLevelConfig, LevelDefinition } from "./types";
+import type { CompiledLevelConfig, LevelDefinition, ZombieSpawn } from "./types";
 
 const validateTileMap = (tiles: LevelDefinition["tiles"], levelId: number) => {
   const width = tiles[0]?.length || 0;
@@ -21,10 +21,10 @@ export function compileLevelDefinition(def: LevelDefinition): CompiledLevelConfi
   const preWaveCount = regularWaves.reduce((sum, wave) => sum + wave.zombies.reduce((batchSum, spawn) => batchSum + spawn.count, 0), 0);
 
   // Build wave spawn batches; the scheduler releases each zombie at the wave interval.
-  const waveSpawns: Array<Array<{ type: "basic" | "imp" | "cone" | "bucket" | "gargantuar"; index: number }>> = [];
+  const waveSpawns: Array<Array<{ type: ZombieSpawn["type"]; index: number }>> = [];
   let zombieIndex = 0;
   for (const wave of def.waves) {
-    const batchZombies: Array<{ type: "basic" | "imp" | "cone" | "bucket" | "gargantuar"; index: number }> = [];
+    const batchZombies: Array<{ type: ZombieSpawn["type"]; index: number }> = [];
     for (const spawn of wave.zombies) {
       for (let i = 0; i < spawn.count; i++) {
         batchZombies.push({ type: spawn.type, index: zombieIndex });
@@ -45,9 +45,9 @@ export function compileLevelDefinition(def: LevelDefinition): CompiledLevelConfi
   const wave2Count = bossWaves[2] ? bossWaves[2].zombies.reduce((sum, spawn) => sum + spawn.count, 0) : 0;
 
   // Build boss wave sequences
-  const bossWaveSequences: Array<Array<{ type: "basic" | "imp" | "cone" | "bucket" | "gargantuar"; index: number }>> = [];
+  const bossWaveSequences: Array<Array<{ type: ZombieSpawn["type"]; index: number }>> = [];
   for (const bossWave of bossWaves) {
-    const waveSequence: Array<{ type: "basic" | "imp" | "cone" | "bucket" | "gargantuar"; index: number }> = [];
+    const waveSequence: Array<{ type: ZombieSpawn["type"]; index: number }> = [];
     zombieIndex = 0;
     for (const spawn of bossWave.zombies) {
       for (let i = 0; i < spawn.count; i++) {
@@ -64,6 +64,9 @@ export function compileLevelDefinition(def: LevelDefinition): CompiledLevelConfi
     unlockAfterLevelId: def.unlockAfterLevelId,
     title: def.title,
     description: def.description,
+    introTexts: def.introTexts,
+    backgroundImage: def.backgroundImage || ((def.category || "day") === "day" ? "/other/bg-day.webp" : "/other/bg-night.webp"),
+    musicTrack: def.musicTrack || ((def.category || "day") === "day" ? "/sound/day.mp3" : "/sound/night.mp3"),
     initialDelayMs: def.initialDelayMs,
     regularSpawnIntervalMs: def.regularSpawnIntervalMs,
     betweenWaveDelayMs: def.betweenWaveDelayMs,
@@ -94,6 +97,9 @@ export function toLevelConfig(compiled: CompiledLevelConfig): LevelConfig {
     unlockAfterLevelId: compiled.unlockAfterLevelId,
     title: compiled.title,
     description: compiled.description,
+    introTexts: compiled.introTexts,
+    backgroundImage: compiled.backgroundImage,
+    musicTrack: compiled.musicTrack,
     preWaveCount: compiled.preWaveCount,
     wave1Count: compiled.wave1Count,
     midCount: compiled.midCount,

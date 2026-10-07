@@ -1,4 +1,4 @@
-export type TileType = "normal" | "normalDark" | "obstructed";
+export type TileType = "normal" | "normalDark" | "obstructed" | "sunflowerStatue";
 
 export interface TileDefinition {
   key: TileType;
@@ -27,6 +27,13 @@ export const TILE_DEFINITIONS: Record<TileType, TileDefinition> = {
     className: "cursor-not-allowed bg-stone-600/90",
     description: "An obstructed tile that cannot hold a plant.",
     label: "Obstructed",
+  },
+  sunflowerStatue: {
+    key: "sunflowerStatue",
+    canPlant: true,
+    className: "bg-lime-700/80 hover:bg-lime-600/90",
+    description: "A sunflower statue blocks planting, zombies, and plant projectiles until destroyed.",
+    label: "Sunflower statue",
   },
 };
 

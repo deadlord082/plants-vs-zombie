@@ -5,6 +5,10 @@ export const LEVEL_1: LevelDefinition = {
   unlockAfterLevelId: 0,
   title: "Three-Lane Lawn",
   description: "Expand your defense across three lanes against basic zombies.",
+  introTexts: [
+    "The lawn has two new lanes.",
+    "Sunflowers generate sun. Use it to build your defense across the new lanes.",
+  ],
   initialDelayMs: 20000,
   regularSpawnIntervalMs: 30000,
   betweenWaveDelayMs: 3000,

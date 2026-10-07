@@ -139,7 +139,8 @@ body {
 
 .shovel-button small {
   position: absolute;
-  right: 0.15rem;
+  right: auto;
+  left: 0.15rem;
   bottom: 0.1rem;
   padding: 0 0.2rem;
   border-radius: 0.2rem;
@@ -148,12 +149,28 @@ body {
   font-size: 0.72rem;
 }
 
+.shortcut-hint {
+  position: absolute;
+  right: 0.12rem;
+  bottom: 0.08rem;
+  padding: 0 0.18rem;
+  border: 1px solid rgb(255 238 187 / 55%);
+  border-radius: 0.18rem;
+  background: rgb(54 35 23 / 88%);
+  color: #fff0bd;
+  font-size: 0.58rem;
+  font-weight: 800;
+  line-height: 1.25;
+  text-shadow: none;
+}
+
 .shovel-button.selected,
 .settings-button:hover {
   background: #6c9b4b;
 }
 
 .settings-button {
+  position: relative;
   width: 3.5rem;
   font-size: 1.7rem;
 }
@@ -195,9 +212,78 @@ body {
   transform: translate(0, -100%) rotate(-12deg);
 }
 
+.lawn-intro-overlay {
+  position: absolute;
+  z-index: 40;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 1.5rem;
+  background: rgb(24 31 19 / 42%);
+  pointer-events: auto;
+}
+
+.lawn-intro-overlay p {
+  max-width: 34rem;
+  margin: 0;
+  padding: 1.25rem 1.5rem;
+  border: 3px solid #6e431f;
+  border-radius: 0.55rem;
+  background: linear-gradient(145deg, #fff4bd, #dba45d);
+  box-shadow: inset 0 0 0 2px #ffe8a0, 0 0.45rem 0 #3d2718, 0 0 2rem rgb(0 0 0 / 35%);
+  color: #432817;
+  font-size: clamp(1rem, 2.5vw, 1.45rem);
+  font-weight: 900;
+  line-height: 1.35;
+  text-align: center;
+  text-shadow: 0 1px #fff7d7;
+  animation: lawn-intro-in 300ms ease-out;
+}
+
+.zombie-frozen {
+  filter: hue-rotate(155deg) saturate(0.65) brightness(1.2);
+}
+
+@keyframes lawn-intro-in {
+  from {
+    opacity: 0;
+    transform: translateY(0.6rem) scale(0.97);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
 .plant-idle {
   animation: plant-idle 3.2s ease-in-out infinite;
   transform-origin: 50% 100%;
+}
+
+.plant-sleeping-indicator {
+  position: absolute;
+  z-index: 20;
+  top: 0;
+  right: 0.1rem;
+  color: #d9f0ff;
+  font-size: 0.8rem;
+  font-weight: 900;
+  text-shadow: 0 1px 3px #152238;
+  animation: sleeping-drift 1.8s ease-in-out infinite;
+}
+
+@keyframes sleeping-drift {
+  0%,
+  100% {
+    opacity: 0.55;
+    transform: translateY(0.35rem) scale(0.9);
+  }
+
+  50% {
+    opacity: 1;
+    transform: translateY(-0.2rem) scale(1.05);
+  }
 }
 
 @keyframes plant-idle {
@@ -235,6 +321,7 @@ body {
 
 .wave-progress-track {
   position: relative;
+  display: flex;
   height: 1rem;
   margin-top: 0.3rem;
   overflow: hidden;
@@ -243,17 +330,53 @@ body {
   background: #38251b;
 }
 
-.wave-progress-fill {
+.wave-progress-segment {
+  position: relative;
+  flex: 1 1 0;
+  min-width: 0;
   height: 100%;
-  background: linear-gradient(90deg, #d2d75d, #f4a51c);
+  border-right: 1px solid #38251b;
+  background: #60432b;
+}
+
+.wave-progress-segment-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #b6ce4e, #edd04d);
   transition: width 200ms linear;
 }
 
-.wave-progress-track i {
+.wave-progress-segment-fill.boss {
+  background: linear-gradient(90deg, #b83232, #ef6148);
+}
+
+.boss-wave-warning {
   position: absolute;
-  inset-block: 0;
-  width: 3px;
-  background: #f7e2a5;
+  z-index: 30;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  pointer-events: none;
+  animation: boss-warning-appear 300ms ease-out;
+}
+
+.boss-wave-warning img {
+  width: min(88%, 42rem);
+  max-height: 70%;
+  object-fit: contain;
+  filter: drop-shadow(0 0.35rem 0.5rem rgb(0 0 0 / 55%));
+}
+
+@keyframes boss-warning-appear {
+  from {
+    opacity: 0;
+    transform: scale(0.92);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 
 .wave-progress p {
@@ -269,6 +392,26 @@ body {
   border-radius: 0.8rem;
   background: linear-gradient(#d3a45e, #9b6334);
   box-shadow: 0 0.6rem 0 #24150f;
+}
+
+.settings-menu {
+  border-color: #ddb86f;
+}
+
+.music-volume-control {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.5rem 1rem;
+  align-items: center;
+  margin: 0.5rem 0 1rem;
+  color: #f8e9bd;
+  text-align: left;
+}
+
+.music-volume-control input {
+  grid-column: 1 / -1;
+  width: 100%;
+  accent-color: #9bbb4e;
 }
 
 .pause-menu h2 {

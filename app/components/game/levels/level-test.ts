@@ -12,15 +12,15 @@ export const LEVEL_test: LevelDefinition = {
   skySunIntervalMs: 1000,
   gloveRechargeMs: 0,
   tiles: [
-    ["normal", "normalDark", "normal", "normalDark", "normal", "normalDark", "normal", "normalDark"],
-    ["normalDark", "normal", "normalDark", "normal", "normalDark", "normal", "normalDark", "normal"],
-    ["normal", "normalDark", "normal", "normalDark", "normal", "normalDark", "normal", "normalDark"],
-    ["normalDark", "normal", "normalDark", "normal", "normalDark", "normal", "normalDark", "normal"],
-    ["normal", "normalDark", "normal", "normalDark", "normal", "normalDark", "normal", "normalDark"],
-    ["normalDark", "normal", "normalDark", "normal", "normalDark", "normal", "normalDark", "normal"],
+    ["normal", "normalDark", "normal", "normalDark", "normal", "sunflowerStatue", "normal", "normalDark"],
+    ["normalDark", "normal", "normalDark", "normal", "normalDark", "sunflowerStatue", "normalDark", "normal"],
+    ["normal", "normalDark", "normal", "normalDark", "normal", "sunflowerStatue", "normal", "normalDark"],
+    ["normalDark", "normal", "normalDark", "normal", "normalDark", "sunflowerStatue", "normalDark", "normal"],
+    ["normal", "normalDark", "normal", "normalDark", "normal", "sunflowerStatue", "normal", "normalDark"],
+    ["normalDark", "normal", "normalDark", "normal", "normalDark", "sunflowerStatue", "normalDark", "normal"],
   ],
   // Each wave batch spawns together; boss waves use the boss spawn timing.
   waves: [
-    { zombies: [{ type: "bucket", count: 1 }] },
+    { zombies: [{ type: "poleVaulting", count: 2 }] },
   ],
 };

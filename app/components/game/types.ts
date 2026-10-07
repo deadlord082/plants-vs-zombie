@@ -1,5 +1,5 @@
-export type BasePlantTypeKey = "sunflower" | "peaShooter" | "wallNut" | "chomper" | "cherryBomb";
-export type FusionPlantTypeKey = "peanut" | "sunNut" | "tallNut" | "chompNut" | "explodeONut" | "twinSunflower" | "sunBomb" | "sunChomper" | "sunshooter" | "repeater" | "chompShooter" | "cherryBomber" | "cherryChomper";
+export type BasePlantTypeKey = "sunflower" | "peaShooter" | "wallNut" | "chomper" | "cherryBomb" | "icebergLettuce";
+export type FusionPlantTypeKey = "peanut" | "sunNut" | "tallNut" | "chompNut" | "explodeONut" | "twinSunflower" | "sunBomb" | "sunChomper" | "sunshooter" | "repeater" | "chompShooter" | "cherryBomber" | "cherryChomper" | "frozenCherry" | "snowPeashooter" | "frostNut";
 export type PlantTypeKey = BasePlantTypeKey | FusionPlantTypeKey;
 export type LevelCategory = "day" | "night" | "pool" | "fog" | "roof" | "mini-game";
 export type GamePhase = "menu" | "category-select" | "level-select" | "shop" | "almanac" | "credits" | "loadout" | "playing" | "complete";
@@ -17,6 +17,9 @@ export interface LevelConfig {
   unlockAfterLevelId?: number;
   title: string;
   description: string;
+  introTexts?: string[];
+  backgroundImage?: string;
+  musicTrack?: string;
   preWaveCount: number;
   wave1Count: number;
   midCount: number;
@@ -60,6 +63,11 @@ export interface PlantSpec {
   eatProjectileDamage?: number;
   eatProjectileImage?: string;
   eatExplosionDamage?: number;
+  freezeDurationMs?: number;
+  freezeOnContact?: boolean;
+  freezeOnHit?: boolean;
+  triggerExplosion?: boolean;
+  blocksPoleVault?: boolean;
 }
 
 export interface PlantInstance {
@@ -81,6 +89,13 @@ export interface PlantInstance {
   nextSunValue?: number;
 }
 
+export interface StatueInstance {
+  id: string;
+  row: number;
+  col: number;
+  hp: number;
+}
+
 export interface ZombieInstance {
   id: string;
   row: number;
@@ -96,6 +111,13 @@ export interface ZombieInstance {
   armorBrokenAt?: number;
   contactStartedAt?: number;
   sunOnKill?: number;
+  nextShotAt?: number;
+  poleVaulted?: boolean;
+  poleVaultingUntil?: number;
+  poleVaultStartedAt?: number;
+  poleVaultStartX?: number;
+  poleVaultTargetX?: number;
+  frozenUntil?: number;
 }
 
 export interface Projectile {
@@ -110,6 +132,7 @@ export interface Projectile {
   blastRadius?: number;
   sunOnKill?: number;
   launchAt?: number;
+  freezeDurationMs?: number;
 }
 
 export interface SunInstance {
@@ -142,4 +165,11 @@ export interface CoinInstance {
   value: number;
   image: string;
   expiresAt: number;
+}
+
+export interface ZombieProjectile {
+  id: string;
+  row: number;
+  x: number;
+  damage: number;
 }

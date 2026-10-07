@@ -4,6 +4,10 @@ export const LEVEL_TUTO: LevelDefinition = {
   id: 0,
   title: "The First Sprout",
   description: "Learn the rhythm of planting, collecting sun, and defending one lane.",
+  introTexts: [
+    "Welcome to Plants vs. Zombies!",
+    "Collect sun and plant Peashooters to stop the zombies from reaching your home and eating your brains.",
+  ],
   initialDelayMs: 20000,
   regularSpawnIntervalMs: 30000,
   betweenWaveDelayMs: 3000,

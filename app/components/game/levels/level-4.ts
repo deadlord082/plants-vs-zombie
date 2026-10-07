@@ -5,6 +5,7 @@ export const LEVEL_4: LevelDefinition = {
     unlockAfterLevelId: 3,
     title: "Conehead Crossing",
     description: "Conehead zombies make their first appearance on the six-lane lawn.",
+    introTexts: ["Wall-nuts have a lot of health. Use them to stop the zombies' march."],
     initialDelayMs: 20000,
     regularSpawnIntervalMs: 30000,
     betweenWaveDelayMs: 3000,
