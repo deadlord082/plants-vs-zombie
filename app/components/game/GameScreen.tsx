@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type PointerEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent } from "react";
 import {
   INITIAL_SUN,
   PLANT_SPECS,
@@ -188,6 +188,15 @@ interface ToolCursorPosition {
   y: number;
 }
 
+interface CoinPickupAnimation {
+  id: string;
+  image: string;
+  startX: number;
+  startY: number;
+  deltaX: number;
+  deltaY: number;
+}
+
 const LEVEL_CATEGORIES: Array<{ key: LevelCategory; name: string; description: string }> = [
   { key: "day", name: "Day", description: "Bright lawns and the beginning of the adventure." },
   { key: "night", name: "Night", description: "A quiet lawn with surprises waiting in the dark." },
@@ -218,6 +227,7 @@ export default function GameScreen() {
   const [selectedLoadout, setSelectedLoadout] = useState<BasePlantTypeKey[]>([]);
   const [almanacCategory, setAlmanacCategory] = useState<AlmanacCategory>("plants");
   const [almanacPlantKey, setAlmanacPlantKey] = useState<BasePlantTypeKey | null>(null);
+  const [almanacReturnPhase, setAlmanacReturnPhase] = useState<"menu" | "playing">("menu");
   const [selectedLevelCategory, setSelectedLevelCategory] = useState<LevelCategory>("day");
   const [shovelSelected, setShovelSelected] = useState(false);
   const [gloveSelected, setGloveSelected] = useState(false);
@@ -235,6 +245,7 @@ export default function GameScreen() {
   const [projectiles, setProjectiles] = useState<Projectile[]>([]);
   const [suns, setSuns] = useState<SunInstance[]>([]);
   const [coins, setCoins] = useState<CoinInstance[]>([]);
+  const [coinPickups, setCoinPickups] = useState<CoinPickupAnimation[]>([]);
   const [statues, setStatues] = useState<StatueInstance[]>([]);
   const [zombieProjectiles, setZombieProjectiles] = useState<ZombieProjectile[]>([]);
   const [regularSpawned, setRegularSpawned] = useState(0);
@@ -254,6 +265,7 @@ export default function GameScreen() {
   const [gameTime, setGameTime] = useState(Date.now());
   const [gameOver, setGameOver] = useState(false);
   const [introTextIndex, setIntroTextIndex] = useState<number | null>(null);
+  const [readyCountdownIndex, setReadyCountdownIndex] = useState<number | null>(null);
   const [showDebugHealth, setShowDebugHealth] = useState(false);
   const [playerData, setPlayerData] = useState<PlayerData>(DEFAULT_PLAYER_DATA);
   const [playerDataLoaded, setPlayerDataLoaded] = useState(false);
@@ -304,6 +316,7 @@ export default function GameScreen() {
   const suppressNextTileClickRef = useRef(false);
   const musicAudioRef = useRef<HTMLAudioElement | null>(null);
   const musicRestartTimerRef = useRef<number | null>(null);
+  const coinBalanceRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     const timeout = window.setTimeout(() => {
@@ -478,6 +491,8 @@ export default function GameScreen() {
     setRewardlessReady(false);
     setGameOver(false);
     setIntroTextIndex(null);
+    setReadyCountdownIndex(null);
+    setCoinPickups([]);
     gameOverRef.current = false;
     completionHandledRef.current = false;
     defeatedZombieIdsRef.current.clear();
@@ -527,6 +542,7 @@ export default function GameScreen() {
     nextSkySunAtRef.current = currentLevelRef.current.skySunIntervalMs ? now + currentLevelRef.current.skySunIntervalMs : 0;
     setGameTime(now);
     setIntroTextIndex(currentLevelRef.current.introTexts?.length ? 0 : null);
+    setReadyCountdownIndex(currentLevelRef.current.introTexts?.length ? null : 0);
     setPhase("playing");
   };
 
@@ -575,6 +591,13 @@ export default function GameScreen() {
     currentLevelRef.current = null;
     setGameOver(false);
     gameOverRef.current = false;
+  };
+
+  const openAlmanac = (returnPhase: "menu" | "playing") => {
+    setAlmanacReturnPhase(returnPhase);
+    setAlmanacPlantKey(null);
+    setShowSettings(false);
+    setPhase("almanac");
   };
 
   const finishLevel = (lastDefeatedZombie: ZombieInstance | null) => {
@@ -699,7 +722,7 @@ export default function GameScreen() {
     if (gloveSelected) return;
     const tile = currentLevelRef.current?.tiles[row]?.[col] || "normal";
     if (!getTileDefinition(tile).canPlant) return;
-    const now = Date.now();
+    const now = gameTime;
     const spec = PLANT_SPECS[selectedPlant];
     if (sunRef.current < spec.cost) return;
     if (plantReadyRef.current[selectedPlant] > now) return;
@@ -718,13 +741,13 @@ export default function GameScreen() {
   };
 
   const handleGlovePointerDown = (row: number, col: number) => {
-    if (!gloveSelected || gloveReadyAt > Date.now()) return;
+    if (!gloveSelected || gloveReadyAt > gameTime) return;
     const plant = plantsRef.current.find((item) => item.row === row && item.col === col);
     if (plant) setMovingPlantId(plant.id);
   };
 
   const handleGlovePointerUp = (row: number, col: number) => {
-    if (!gloveSelected || !movingPlantId || gloveReadyAt > Date.now()) return;
+    if (!gloveSelected || !movingPlantId || gloveReadyAt > gameTime) return;
     const destinationPlant = plantsRef.current.find((plant) => plant.row === row && plant.col === col);
     const movingPlant = plantsRef.current.find((plant) => plant.id === movingPlantId);
     const tile = currentLevelRef.current?.tiles[row]?.[col] || "normal";
@@ -735,7 +758,7 @@ export default function GameScreen() {
       setMovingPlantId(null);
       return;
     }
-    const now = Date.now();
+    const now = gameTime;
     if (fusionType && destinationPlant) {
       const fusedPlant = getPlantInstance(fusionType, row, col, now);
       setPlantsState(plantsRef.current
@@ -769,11 +792,27 @@ export default function GameScreen() {
     setSunState(sunRef.current + collectedSun.value);
   };
 
-  const collectCoin = (coinId: string) => {
-    if (phase !== "playing") return;
+  const collectCoin = (coinId: string, source: HTMLElement) => {
+    if (phase !== "playing" && phase !== "complete") return;
     const collectedCoin = coinsRef.current.find((coin) => coin.id === coinId);
     if (!collectedCoin) return;
     setCoinsState(coinsRef.current.filter((coin) => coin.id !== coinId));
+    const sourceBounds = source.getBoundingClientRect();
+    const targetBounds = coinBalanceRef.current?.getBoundingClientRect();
+    if (targetBounds) {
+      const pickupId = createId();
+      setCoinPickups((current) => [...current, {
+        id: pickupId,
+        image: collectedCoin.image,
+        startX: sourceBounds.left + sourceBounds.width / 2,
+        startY: sourceBounds.top + sourceBounds.height / 2,
+        deltaX: targetBounds.left + targetBounds.width / 2 - sourceBounds.left - sourceBounds.width / 2,
+        deltaY: targetBounds.top + targetBounds.height / 2 - sourceBounds.top - sourceBounds.height / 2,
+      }]);
+      window.setTimeout(() => {
+        setCoinPickups((current) => current.filter((pickup) => pickup.id !== pickupId));
+      }, 700);
+    }
     const nextData = {
       ...playerDataRef.current,
       money: playerDataRef.current.money + collectedCoin.value,
@@ -783,7 +822,7 @@ export default function GameScreen() {
   };
 
   const spawnZombie = (isWave: boolean, type: string = "basic") => {
-    const now = Date.now();
+    const now = gameTime;
     const spec = ZOMBIE_SPECS[type] || ZOMBIE_SPECS.basic;
     const gridCols = getGridCols(currentLevelRef.current);
     const gridRows = getGridRows(currentLevelRef.current);
@@ -805,7 +844,7 @@ export default function GameScreen() {
   };
 
   useEffect(() => {
-    if (phase !== "playing" || gameOver || isPaused || introTextIndex !== null) {
+    if (phase !== "playing" || gameOver || isPaused || introTextIndex !== null || readyCountdownIndex !== null) {
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
         intervalRef.current = null;
@@ -814,7 +853,7 @@ export default function GameScreen() {
     }
 
     intervalRef.current = setInterval(() => {
-      setGameTime(Date.now());
+      setGameTime((time) => time + GAME_TICK_MS);
     }, GAME_TICK_MS);
 
     return () => {
@@ -822,20 +861,32 @@ export default function GameScreen() {
         clearInterval(intervalRef.current);
       }
     };
-  }, [phase, gameOver, isPaused, introTextIndex]);
+  }, [phase, gameOver, isPaused, introTextIndex, readyCountdownIndex]);
 
   useEffect(() => {
     if (phase !== "playing" || isPaused || introTextIndex === null || currentLevel === null) return;
 
     const timeout = window.setTimeout(() => {
-      setIntroTextIndex((index) => {
-        if (index === null || !currentLevelRef.current?.introTexts || index + 1 >= currentLevelRef.current.introTexts.length) return null;
-        return index + 1;
-      });
+      if (!currentLevel.introTexts || introTextIndex + 1 >= currentLevel.introTexts.length) {
+        setIntroTextIndex(null);
+        setReadyCountdownIndex(0);
+      } else {
+        setIntroTextIndex(introTextIndex + 1);
+      }
     }, INTRO_TEXT_DURATION_MS);
 
     return () => window.clearTimeout(timeout);
   }, [phase, isPaused, introTextIndex, currentLevel]);
+
+  useEffect(() => {
+    if (phase !== "playing" || isPaused || readyCountdownIndex === null) return;
+
+    const timeout = window.setTimeout(() => {
+      setReadyCountdownIndex((index) => index === null || index >= 2 ? null : index + 1);
+    }, 1000);
+
+    return () => window.clearTimeout(timeout);
+  }, [phase, isPaused, readyCountdownIndex]);
 
   useEffect(() => {
     const handleDebugKey = (event: KeyboardEvent) => {
@@ -855,7 +906,7 @@ export default function GameScreen() {
         setGloveSelected(false);
         setMovingPlantId(null);
         setToolCursorPosition(null);
-      } else if (event.key === "2" && playerData.gloveUnlocked && Date.now() >= gloveReadyAt) {
+      } else if (event.key === "2" && playerData.gloveUnlocked && gameTime >= gloveReadyAt) {
         setGloveSelected(!gloveSelected);
         setShovelSelected(false);
         setMovingPlantId(null);
@@ -865,10 +916,10 @@ export default function GameScreen() {
 
     window.addEventListener("keydown", handleDebugKey);
     return () => window.removeEventListener("keydown", handleDebugKey);
-  }, [phase, shovelSelected, gloveSelected, playerData.gloveUnlocked, gloveReadyAt]);
+  }, [phase, shovelSelected, gloveSelected, playerData.gloveUnlocked, gloveReadyAt, gameTime]);
 
   useEffect(() => {
-    if (phase !== "playing" || currentLevel === null || isPaused || introTextIndex !== null) return;
+    if (phase !== "playing" || currentLevel === null || isPaused || introTextIndex !== null || readyCountdownIndex !== null) return;
 
     const now = gameTime;
     const gridCols = getGridCols(currentLevel);
@@ -1499,7 +1550,7 @@ export default function GameScreen() {
     ) {
       finishLevel(lastDefeatedZombie);
     }
-  }, [gameTime, phase, currentLevel, isPaused, introTextIndex]);
+  }, [gameTime, phase, currentLevel, isPaused, introTextIndex, readyCountdownIndex]);
 
   const grid = useMemo(
     () =>
@@ -1585,7 +1636,7 @@ export default function GameScreen() {
             <div className="menu-actions">
               <button type="button" onClick={() => setPhase("category-select")} className="menu-primary">Start Game <span>→</span></button>
               <button type="button" onClick={() => setPhase("shop")} className="menu-secondary">Shop <span>◆</span></button>
-              <button type="button" onClick={() => setPhase("almanac")} className="menu-secondary">Open Almanac <span>▣</span></button>
+              <button type="button" onClick={() => openAlmanac("menu")} className="menu-secondary">Open Almanac <span className="almanac-menu-icon"><img src="/other/almanac.webp" alt="" /></span></button>
               <button type="button" onClick={() => setPhase("credits")} className="menu-secondary">Credits <span>✦</span></button>
             </div>
           </div>
@@ -1670,7 +1721,7 @@ export default function GameScreen() {
 
         {phase === "almanac" && (
           <div className="almanac-screen">
-            <div className="screen-heading"><div><p className="menu-kicker">Know your tools</p><h2>Almanac</h2><p>Everything discovered on the lawn, in one place.</p></div><button type="button" onClick={() => setPhase("menu")} className="text-button">Back to menu</button></div>
+            <div className="screen-heading"><div><p className="menu-kicker">Know your tools</p><h2>Almanac</h2><p>Everything discovered on the lawn, in one place.</p></div><button type="button" onClick={() => { setPhase(almanacReturnPhase); if (almanacReturnPhase === "menu") setIsPaused(false); }} className="text-button">{almanacReturnPhase === "playing" ? "Back to pause menu" : "Back to main menu"}</button></div>
             <div className="almanac-tabs" role="tablist" aria-label="Almanac categories">
               {(["plants", "zombies", "tiles"] as AlmanacCategory[]).map((category) => <button key={category} type="button" role="tab" aria-selected={almanacCategory === category} onClick={() => setAlmanacCategory(category)} className={almanacCategory === category ? "active" : ""}>{category}</button>)}
             </div>
@@ -1857,6 +1908,15 @@ export default function GameScreen() {
                   </div>
                 )}
 
+                {readyCountdownIndex !== null && (
+                  <div className="lawn-countdown-overlay" role="status" aria-live="assertive">
+                    <img
+                      src={`/other/${["ready", "set", "plant"][readyCountdownIndex]}.webp`}
+                      alt={["Ready", "Set", "Plant"][readyCountdownIndex]}
+                    />
+                  </div>
+                )}
+
                 {suns.map((sunDrop) => (
                   <button
                     key={sunDrop.id}
@@ -1888,8 +1948,8 @@ export default function GameScreen() {
                     key={coin.id}
                     type="button"
                     aria-label={`Collect $${coin.value}`}
-                    onMouseEnter={() => collectCoin(coin.id)}
-                    onFocus={() => collectCoin(coin.id)}
+                    onMouseEnter={(event) => collectCoin(coin.id, event.currentTarget)}
+                    onFocus={(event) => collectCoin(coin.id, event.currentTarget)}
                     className="absolute z-20 -translate-x-1/2 -translate-y-1/2 transition hover:scale-110"
                     style={{
                       left: `${(coin.x / gridCols) * 100}%`,
@@ -2009,20 +2069,43 @@ export default function GameScreen() {
               </div>
             </div>
 
-            <div className="wave-progress" aria-label={`Wave progress: ${completedWaveCount} of ${waveProgressSegments.length} waves spawned`}>
-              <div className="wave-progress-label"><span>Wave progress</span><span>{completedWaveCount} / {waveProgressSegments.length} waves</span></div>
-              <div className="wave-progress-track">
-                {waveProgressSegments.map((segment, index) => (
-                  <div key={`wave-${index}`} className="wave-progress-segment" aria-label={`${segment.isBoss ? "Boss " : ""}wave ${index + 1}`}>
-                    <div className={`wave-progress-segment-fill ${segment.isBoss ? "boss" : ""}`} style={{ width: `${segment.progress}%` }} />
-                  </div>
-                ))}
+            <div className="wave-status-row">
+              <div ref={coinBalanceRef} className="coin-balance" aria-label={`Player money: $${playerData.money}`}>
+                <img src="/other/silver-coin.webp" alt="" />
+                <strong>{playerData.money}</strong>
+                <span>$</span>
               </div>
-              <p>{waveStageLabel}</p>
+              <div className="wave-progress" aria-label={`Wave progress: ${completedWaveCount} of ${waveProgressSegments.length} waves spawned`}>
+                <div className="wave-progress-label"><span>Wave progress</span><span>{completedWaveCount} / {waveProgressSegments.length} waves</span></div>
+                <div className="wave-progress-track">
+                  {waveProgressSegments.map((segment, index) => (
+                    <div key={`wave-${index}`} className="wave-progress-segment" aria-label={`${segment.isBoss ? "Boss " : ""}wave ${index + 1}`}>
+                      <div className={`wave-progress-segment-fill ${segment.isBoss ? "boss" : ""}`} style={{ width: `${segment.progress}%` }} />
+                    </div>
+                  ))}
+                </div>
+                <p>{waveStageLabel}</p>
+              </div>
             </div>
           </div>
         )}
       </div>
+
+      {coinPickups.map((pickup) => (
+        <img
+          key={pickup.id}
+          src={pickup.image}
+          alt=""
+          aria-hidden="true"
+          className="coin-pickup-animation"
+          style={{
+            left: pickup.startX,
+            top: pickup.startY,
+            "--coin-delta-x": `${pickup.deltaX}px`,
+            "--coin-delta-y": `${pickup.deltaY}px`,
+          } as CSSProperties}
+        />
+      ))}
 
       {isPaused && phase === "playing" && (
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/60 px-4">
@@ -2030,6 +2113,7 @@ export default function GameScreen() {
             <h2>Paused</h2>
             <button type="button" onClick={() => { setShowSettings(false); setIsPaused(false); }}>Resume</button>
             <button type="button" onClick={() => setShowSettings(true)}>Settings</button>
+            <button type="button" onClick={() => openAlmanac("playing")}><img src="/other/almanac.webp" alt="" /> Almanac</button>
             <button type="button" onClick={() => currentLevelRef.current && startLevel(currentLevelRef.current.id)}>Restart level</button>
             <button type="button" onClick={returnToMenu}>Return to main menu</button>
           </div>
