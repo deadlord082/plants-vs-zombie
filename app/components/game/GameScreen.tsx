@@ -168,6 +168,8 @@ const DEFAULT_PLAYER_DATA: PlayerData = {
   zombieKills: {},
   unlockedPlants: ["peaShooter"],
   completedLevels: [],
+  difficulty: "normal",
+  levelTrophies: {},
   seedBankSize: INITIAL_SEED_BANK_SIZE,
   seedSlotsPurchased: 0,
   gloveUnlocked: false,
@@ -211,10 +213,44 @@ interface PlayerData {
   zombieKills: Record<string, number>;
   unlockedPlants: BasePlantTypeKey[];
   completedLevels: number[];
+  difficulty: Difficulty;
+  levelTrophies: Record<number, Difficulty>;
   seedBankSize: number;
   seedSlotsPurchased: number;
   gloveUnlocked: boolean;
 }
+
+type Difficulty = "easy" | "normal" | "hard" | "impossible";
+
+const DIFFICULTIES: Array<{ key: Difficulty; label: string; color: string }> = [
+  { key: "easy", label: "Easy", color: "#58b947" },
+  { key: "normal", label: "Normal", color: "#ffffff" },
+  { key: "hard", label: "Hard", color: "#ed4545" },
+  { key: "impossible", label: "Impossible", color: "#171717" },
+];
+const DIFFICULTY_RANK: Record<Difficulty, number> = { easy: 0, normal: 1, hard: 2, impossible: 3 };
+const DIFFICULTY_SETTINGS: Record<Difficulty, {
+  damageTakenMultiplier: number;
+  moveDurationMultiplier: number;
+  damageDealtMultiplier: number;
+  interWaveDelayMultiplier: number;
+  interWaveDelayAdjustmentMs: number;
+}> = {
+  easy: { damageTakenMultiplier: 1.3, moveDurationMultiplier: 1.2, damageDealtMultiplier: 1, interWaveDelayMultiplier: 2, interWaveDelayAdjustmentMs: 0 },
+  normal: { damageTakenMultiplier: 1, moveDurationMultiplier: 1, damageDealtMultiplier: 1, interWaveDelayMultiplier: 1, interWaveDelayAdjustmentMs: 0 },
+  hard: { damageTakenMultiplier: 0.8, moveDurationMultiplier: 1, damageDealtMultiplier: 1, interWaveDelayMultiplier: 1, interWaveDelayAdjustmentMs: -2000 },
+  impossible: { damageTakenMultiplier: 0.5, moveDurationMultiplier: 0.8, damageDealtMultiplier: 1.5, interWaveDelayMultiplier: 1, interWaveDelayAdjustmentMs: -4000 },
+};
+const TROPHY_IMAGES: Record<Difficulty, string> = {
+  easy: "/other/trophy-easy.webp",
+  normal: "/other/trophy-normal.webp",
+  hard: "/other/trophy-hard.webp",
+  impossible: "/other/trophy-impossible.webp",
+};
+const isDifficulty = (value: unknown): value is Difficulty =>
+  DIFFICULTIES.some(({ key }) => key === value);
+const getTrophyImage = (difficulty: Difficulty | undefined) =>
+  difficulty ? TROPHY_IMAGES[difficulty] : null;
 
 const randomizeInterval = (interval: number): number => {
   const variance = 1 + (Math.random() - 0.5) * 0.2;
@@ -392,13 +428,24 @@ export default function GameScreen() {
           ? parsed.unlockedPlants.filter((key): key is BasePlantTypeKey =>
             key === "peaShooter" || key === "sunflower" || key === "wallNut" || key === "chomper" || key === "cherryBomb" || key === "icebergLettuce")
           : DEFAULT_PLAYER_DATA.unlockedPlants;
+        const storedLevelTrophies = parsed.levelTrophies && typeof parsed.levelTrophies === "object" && !Array.isArray(parsed.levelTrophies)
+          ? Object.fromEntries(Object.entries(parsed.levelTrophies)
+            .filter(([levelId, difficulty]) => Number.isInteger(Number(levelId)) && isDifficulty(difficulty)))
+          : {};
+        const completedLevels = Array.isArray(parsed.completedLevels)
+          ? parsed.completedLevels.filter((levelId): levelId is number => Number.isInteger(levelId) && levelId >= 0)
+          : [];
+        const levelTrophies: Record<number, Difficulty> = Object.fromEntries(completedLevels.map((levelId) => [
+          levelId,
+          isDifficulty(storedLevelTrophies[levelId]) ? storedLevelTrophies[levelId] : "normal",
+        ]));
         const loadedData: PlayerData = {
           money: Number.isInteger(storedMoney) && storedMoney >= 0 ? storedMoney : 0,
           zombieKills: storedZombieKills,
           unlockedPlants: Array.from(new Set(["peaShooter", ...unlockedPlants])) as BasePlantTypeKey[],
-          completedLevels: Array.isArray(parsed.completedLevels)
-            ? parsed.completedLevels.filter((levelId): levelId is number => Number.isInteger(levelId) && levelId >= 0)
-            : [],
+          completedLevels,
+          difficulty: isDifficulty(parsed.difficulty) ? parsed.difficulty : "normal",
+          levelTrophies,
           seedBankSize: INITIAL_SEED_BANK_SIZE + seedSlotsPurchased,
           seedSlotsPurchased,
           gloveUnlocked: parsed.gloveUnlocked === true,
@@ -608,6 +655,16 @@ export default function GameScreen() {
     setMovingPlantId(null);
     setToolCursorPosition(null);
     const levelId = currentLevelRef.current.id;
+    const difficulty = playerDataRef.current.difficulty;
+    const previousTrophy = playerDataRef.current.levelTrophies[levelId];
+    if (!previousTrophy || DIFFICULTY_RANK[difficulty] > DIFFICULTY_RANK[previousTrophy]) {
+      const nextData = {
+        ...playerDataRef.current,
+        levelTrophies: { ...playerDataRef.current.levelTrophies, [levelId]: difficulty },
+      };
+      playerDataRef.current = nextData;
+      setPlayerData(nextData);
+    }
     const alreadyCompleted = playerDataRef.current.completedLevels.includes(levelId);
     if (alreadyCompleted) {
       setPhase("complete");
@@ -704,6 +761,12 @@ export default function GameScreen() {
       seedBankSize: playerDataRef.current.seedBankSize + 1,
       seedSlotsPurchased: purchaseIndex + 1,
     };
+    playerDataRef.current = nextData;
+    setPlayerData(nextData);
+  };
+
+  const selectDifficulty = (difficulty: Difficulty) => {
+    const nextData = { ...playerDataRef.current, difficulty };
     playerDataRef.current = nextData;
     setPlayerData(nextData);
   };
@@ -982,6 +1045,7 @@ export default function GameScreen() {
     let nextCoins = coinsRef.current.filter((coin) => coin.expiresAt > now);
 
     const spawnState = spawnScheduleRef.current;
+    const difficultySettings = DIFFICULTY_SETTINGS[playerData.difficulty];
     const regularInterval = currentLevel.regularSpawnIntervalMs;
     const waveInterval = currentLevel.waveSpawnIntervalMs;
     const betweenDelay = currentLevel.betweenWaveDelayMs;
@@ -1080,7 +1144,11 @@ export default function GameScreen() {
         spawnState.nextWaveStart = 0;
         if (compiledLevel?.spawnWaves[spawnState.batchIndex]) {
           const followingWave = compiledLevel.spawnWaves[spawnState.batchIndex];
-          const nextWaveDelay = Math.max(regularInterval, betweenDelay);
+          const baseWaveDelay = Math.max(regularInterval, betweenDelay);
+          const nextWaveDelay = Math.max(
+            0,
+            baseWaveDelay * difficultySettings.interWaveDelayMultiplier + difficultySettings.interWaveDelayAdjustmentMs,
+          );
           if (followingWave.isBoss) {
             spawnState.nextWaveStart = now + nextWaveDelay;
           } else {
@@ -1117,12 +1185,13 @@ export default function GameScreen() {
             ? "Buckethead zombie"
             : "Gargantuar";
     const applyZombieDamage = (zombie: ZombieInstance, damage: number, now: number): ZombieInstance => {
-      const armorDamage = Math.min(zombie.armor, damage);
+      const adjustedDamage = Math.max(0, Math.round(damage * difficultySettings.damageTakenMultiplier));
+      const armorDamage = Math.min(zombie.armor, adjustedDamage);
       const armor = zombie.armor - armorDamage;
       return {
         ...zombie,
         armor,
-        hp: Math.max(0, zombie.hp - (damage - armorDamage)),
+        hp: Math.max(0, zombie.hp - (adjustedDamage - armorDamage)),
         armorBrokenAt: zombie.armor > 0 && armor === 0 ? now : zombie.armorBrokenAt,
       };
     };
@@ -1404,7 +1473,12 @@ export default function GameScreen() {
         };
       }
       if (zombie.type === "peashooterZombie" && zombie.nextShotAt && now >= zombie.nextShotAt) {
-        nextZombieProjectiles.push({ id: createId(), row: zombie.row, x: zombie.x, damage: 20 });
+        nextZombieProjectiles.push({
+          id: createId(),
+          row: zombie.row,
+          x: zombie.x,
+          damage: Math.round(20 * difficultySettings.damageDealtMultiplier),
+        });
         const shotInterval = zombie.frozenUntil && zombie.frozenUntil > now ? PEASHOOTER_SHOOT_MS * 2 : PEASHOOTER_SHOOT_MS;
         zombie = { ...zombie, nextShotAt: zombie.nextShotAt + shotInterval };
       }
@@ -1413,7 +1487,8 @@ export default function GameScreen() {
         const attackInterval = zombie.frozenUntil && zombie.frozenUntil > now ? zombieSpec.attackMs * 2 : zombieSpec.attackMs;
         if (zombie.contactStartedAt === undefined) zombie = { ...zombie, contactStartedAt: now };
         else if (now - zombie.contactStartedAt >= attackInterval && now - zombie.lastAttackAt >= attackInterval) {
-          const nextStatues = statuesRef.current.map((item) => item.id === statue.id ? { ...item, hp: item.hp - zombieSpec.damage } : item).filter((item) => item.hp > 0);
+          const zombieDamage = Math.round(zombieSpec.damage * difficultySettings.damageDealtMultiplier);
+          const nextStatues = statuesRef.current.map((item) => item.id === statue.id ? { ...item, hp: item.hp - zombieDamage } : item).filter((item) => item.hp > 0);
           statuesRef.current = nextStatues;
           setStatues(nextStatues);
           zombie = { ...zombie, lastAttackAt: now };
@@ -1443,7 +1518,8 @@ export default function GameScreen() {
           zombie = { ...zombie, contactStartedAt: now };
         } else if (now - zombie.contactStartedAt >= attackInterval && now - zombie.lastAttackAt >= attackInterval) {
           const plant = nextPlants[plantIndex];
-          const nextHp = PLANT_SPECS[plant.type].triggerExplosion || plant.type === "cherryBomb" ? plant.hp : Math.max(0, plant.hp - zombieSpec.damage);
+          const zombieDamage = Math.round(zombieSpec.damage * difficultySettings.damageDealtMultiplier);
+          const nextHp = PLANT_SPECS[plant.type].triggerExplosion || plant.type === "cherryBomb" ? plant.hp : Math.max(0, plant.hp - zombieDamage);
           const stageChanged = plant.type === "explodeONut" && getNutDamageStage(plant.hp) !== getNutDamageStage(nextHp);
           nextPlants[plantIndex] = { ...plant, hp: nextHp };
           if (PLANT_SPECS[plant.type].freezeOnContact) zombie = { ...zombie, frozenUntil: Math.max(zombie.frozenUntil || 0, now + (PLANT_SPECS[plant.type].freezeDurationMs || 5000)) };
@@ -1470,7 +1546,8 @@ export default function GameScreen() {
 
       // Move continuously towards left with marching gait (sine wave speed variation)
       // Each zombie type has its own speed from spec
-      const moveInterval = zombie.frozenUntil && zombie.frozenUntil > now ? zombieSpec.moveMs * 2 : zombieSpec.moveMs;
+      const moveInterval = (zombie.frozenUntil && zombie.frozenUntil > now ? zombieSpec.moveMs * 2 : zombieSpec.moveMs)
+        * difficultySettings.moveDurationMultiplier;
       const speedPerTick = GAME_TICK_MS / moveInterval; // tiles per tick
       const elapsedMs = now - zombie.spawnedAt;
       const phase = (elapsedMs / walkPeriodMs) * Math.PI * 2;
@@ -1550,7 +1627,7 @@ export default function GameScreen() {
     ) {
       finishLevel(lastDefeatedZombie);
     }
-  }, [gameTime, phase, currentLevel, isPaused, introTextIndex, readyCountdownIndex]);
+  }, [gameTime, phase, currentLevel, isPaused, introTextIndex, readyCountdownIndex, playerData.difficulty]);
 
   const grid = useMemo(
     () =>
@@ -1562,6 +1639,16 @@ export default function GameScreen() {
   const gridRows = getGridRows(currentLevel);
   const gridCols = getGridCols(currentLevel);
   const compiledCurrentLevel = currentLevel ? getCompiledLevel(currentLevel.id) : null;
+  const getCategoryTrophy = (category: LevelCategory): Difficulty | undefined => {
+    const categoryLevels = LEVELS.filter((level) => level.category === category);
+    if (categoryLevels.length === 0 || categoryLevels.some((level) => !playerData.completedLevels.includes(level.id))) return undefined;
+    const trophies = categoryLevels.map((level) => playerData.levelTrophies[level.id]);
+    if (trophies.some((difficulty) => !difficulty)) return undefined;
+    return trophies.filter(isDifficulty).reduce<Difficulty>((lowest, difficulty) =>
+      DIFFICULTY_RANK[difficulty] < DIFFICULTY_RANK[lowest] ? difficulty : lowest, "impossible");
+  };
+  const selectedDifficultyIndex = DIFFICULTIES.findIndex(({ key }) => key === playerData.difficulty);
+  const selectedDifficulty = DIFFICULTIES[selectedDifficultyIndex];
 
   const zombiesSent = spawnedZombieCount;
   let zombiesBeforeWave = 0;
@@ -1665,12 +1752,16 @@ export default function GameScreen() {
               {LEVEL_CATEGORIES.map((category) => {
                 const categoryLevels = LEVELS.filter((level) => level.category === category.key);
                 const isCompleted = categoryLevels.length > 0 && categoryLevels.every((level) => playerData.completedLevels.includes(level.id));
+                const categoryTrophy = getCategoryTrophy(category.key);
                 return (
                   <button key={category.key} type="button" onClick={() => { setSelectedLevelCategory(category.key); setPhase("level-select"); }} className={`category-card ${isCompleted ? "completed" : ""}`}>
                     {isCompleted && <span className="level-completed-ribbon">Completed</span>}
                     <span className="category-card-number">{categoryLevels.length || "-"}</span>
                     <span className="category-card-content"><strong>{category.name}</strong><small>{category.description}</small><em>{categoryLevels.length ? `${categoryLevels.length} level${categoryLevels.length === 1 ? "" : "s"}` : "Coming soon"}</em></span>
-                    <span className="category-card-arrow">→</span>
+                    <span className="category-card-trailing">
+                      {categoryTrophy && <img className="difficulty-trophy category-difficulty-trophy" src={TROPHY_IMAGES[categoryTrophy]} alt={`${categoryTrophy} category trophy`} />}
+                      <span className="category-card-arrow">→</span>
+                    </span>
                   </button>
                 );
               })}
@@ -1681,6 +1772,26 @@ export default function GameScreen() {
         {phase === "level-select" && (
           <div className="level-select-screen">
             <div className="screen-heading"><div><p className="menu-kicker">{LEVEL_CATEGORIES.find((category) => category.key === selectedLevelCategory)?.name} category</p><h2>Select a Level</h2><p>Each lawn brings a different layout and wave pattern.</p></div><button type="button" onClick={() => setPhase("category-select")} className="text-button">Back</button></div>
+            <section className={`difficulty-selector difficulty-${playerData.difficulty}`} aria-labelledby="difficulty-title" style={{ "--difficulty-color": selectedDifficulty.color } as CSSProperties}>
+              <div className="difficulty-selector-heading">
+                <div><h3 id="difficulty-title">Difficulty</h3><p>Changes apply to your next level.</p></div>
+                <output className={`difficulty-current difficulty-current-${playerData.difficulty}`} htmlFor="difficulty-slider">{selectedDifficulty.label}</output>
+              </div>
+              <input
+                id="difficulty-slider"
+                type="range"
+                min="0"
+                max={DIFFICULTIES.length - 1}
+                step="1"
+                value={selectedDifficultyIndex}
+                aria-label="Difficulty"
+                aria-valuetext={selectedDifficulty.label}
+                onChange={(event) => selectDifficulty(DIFFICULTIES[Number(event.currentTarget.value)].key)}
+              />
+              <div className="difficulty-ticks" aria-hidden="true">
+                {DIFFICULTIES.map((difficulty) => <span key={difficulty.key} className={`difficulty-tick difficulty-tick-${difficulty.key} ${difficulty.key === playerData.difficulty ? "selected" : ""}`}>{difficulty.label}</span>)}
+              </div>
+            </section>
             <div className="level-card-grid">
               {LEVELS.filter((level) => level.category === selectedLevelCategory).map((level) => (
                 <div key={level.id} className={`level-card ${level.unlockAfterLevelId !== undefined && !playerData.completedLevels.includes(level.unlockAfterLevelId) ? "locked" : ""}`}>
@@ -1692,6 +1803,7 @@ export default function GameScreen() {
                     </div>
                     <div className="level-card-actions">
                       <button type="button" onClick={() => startLevel(level.id)} disabled={level.unlockAfterLevelId !== undefined && !playerData.completedLevels.includes(level.unlockAfterLevelId)} className="menu-primary disabled:cursor-not-allowed disabled:opacity-50">{level.unlockAfterLevelId !== undefined && !playerData.completedLevels.includes(level.unlockAfterLevelId) ? "Locked" : "Play Level"} <span>{level.unlockAfterLevelId !== undefined && !playerData.completedLevels.includes(level.unlockAfterLevelId) ? "●" : "→"}</span></button>
+                      {getTrophyImage(playerData.levelTrophies[level.id]) && <img className="difficulty-trophy level-difficulty-trophy" src={getTrophyImage(playerData.levelTrophies[level.id])!} alt={`${playerData.levelTrophies[level.id]} difficulty trophy`} />}
                     </div>
                   </div>
                 </div>

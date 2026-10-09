@@ -2,12 +2,18 @@
 
 choper des vrais assets pour les projectiles des fusions.
 trouver un putain d'asset pour l'explosion de cherry bomb.
+faire un meilleur assets pour le trophy impossible + transform les fichier png en webp
 rajouter un lawnmower par niveaux qui se déclenche une fois dans la lane perdante.
 fix le gargantuars qui est trop large pour tenir sur une lane.
 
 ajouter les trucs web pour le référencement + icons etc...
 
-rajouter un slider de difficulté
+choper asset destruction chomp-nut
+fix cherry nut pour quelle explose après chaque stade de destruction
+
+ajouter une surbrillance sur les plantes quand une fusion est disponible soit en deplacement soit en plantant
+
+rajouter une réduction sur la prod de sun si meme le slider de difficultés est pas suffissant
 
 rajouter des sonds / musiques.
 rajouter des tiles / les utiliser dans les nouveaux niveaux

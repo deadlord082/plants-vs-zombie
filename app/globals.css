@@ -1410,6 +1410,13 @@ body {
   font-weight: 900;
 }
 
+.category-card-trailing {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+}
+
 .category-card .level-completed-ribbon {
   top: 0.7rem;
   right: -2.4rem;
@@ -1450,6 +1457,151 @@ body {
   align-items: center;
   gap: 0.55rem;
   margin-top: 1rem;
+}
+
+.difficulty-selector {
+  margin-top: 1rem;
+  padding: 1rem 1.25rem 0.8rem;
+  border: 3px solid #5b3820;
+  border-radius: 0.75rem;
+  background: linear-gradient(110deg, #8a5930, #4a2d20);
+  box-shadow: inset 0 0 0 2px #bd854b, 0 0.35rem 0 #2c1b13;
+}
+
+.difficulty-selector-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.difficulty-selector-heading h3 {
+  margin: 0;
+  color: #fff5c6;
+  font-size: 1.1rem;
+}
+
+.difficulty-selector-heading p {
+  margin: 0.2rem 0 0;
+  color: #edca88;
+  font-size: 0.85rem;
+}
+
+.difficulty-current {
+  padding: 0.25rem 0.65rem;
+  border: 2px solid var(--difficulty-color);
+  border-radius: 999px;
+  color: var(--difficulty-color);
+  font-weight: 900;
+}
+
+.difficulty-current-impossible {
+  background: #f5f0e3;
+  color: #171717;
+}
+
+.difficulty-selector input[type="range"] {
+  display: block;
+  width: 100%;
+  height: 1.3rem;
+  margin: 0.9rem 0 0.35rem;
+  appearance: none;
+  background: transparent;
+  cursor: pointer;
+}
+
+.difficulty-selector input[type="range"]::-webkit-slider-runnable-track {
+  height: 0.45rem;
+  border: 1px solid #38251b;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #58b947 0%, #ffffff 35%, #ed4545 68%, #171717 100%);
+}
+
+.difficulty-selector input[type="range"]::-moz-range-track {
+  height: 0.45rem;
+  border: 1px solid #38251b;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #58b947 0%, #ffffff 35%, #ed4545 68%, #171717 100%);
+}
+
+.difficulty-selector input[type="range"]::-webkit-slider-thumb {
+  width: 1.15rem;
+  height: 1.15rem;
+  margin-top: -0.42rem;
+  appearance: none;
+  border: 3px solid #fff4bd;
+  border-radius: 50%;
+  background: var(--difficulty-color);
+  box-shadow: 0 1px 4px rgb(0 0 0 / 60%);
+}
+
+.difficulty-selector input[type="range"]::-moz-range-thumb {
+  width: 0.85rem;
+  height: 0.85rem;
+  border: 3px solid #fff4bd;
+  border-radius: 50%;
+  background: var(--difficulty-color);
+  box-shadow: 0 1px 4px rgb(0 0 0 / 60%);
+}
+
+.difficulty-selector input[type="range"]:focus-visible {
+  outline: 3px solid #fff4bd;
+  outline-offset: 4px;
+}
+
+.difficulty-ticks {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.difficulty-tick {
+  color: #f1dfb5;
+  font-size: 0.85rem;
+  font-weight: 800;
+}
+
+.difficulty-tick-easy {
+  color: #78d365;
+}
+
+.difficulty-tick-normal {
+  color: #ffffff;
+}
+
+.difficulty-tick-hard {
+  color: #ff6464;
+}
+
+.difficulty-tick-impossible {
+  padding-inline: 0.25rem;
+  border-radius: 0.2rem;
+  background: #f5f0e3;
+  color: #171717;
+}
+
+.difficulty-tick.selected {
+  text-decoration: underline;
+  text-underline-offset: 0.2rem;
+}
+
+.difficulty-trophy {
+  display: block;
+  width: 3.25rem;
+  height: 3.25rem;
+  flex: 0 0 auto;
+  object-fit: contain;
+  filter: drop-shadow(0 2px 4px rgb(0 0 0 / 45%));
+}
+
+.category-difficulty-trophy {
+  width: 2.75rem;
+  height: 2.75rem;
+}
+
+.level-difficulty-trophy {
+  width: 3.5rem;
+  height: 3.5rem;
 }
 
 .level-card.locked {
@@ -1684,6 +1836,10 @@ body {
 @media (max-width: 560px) {
   .screen-heading {
     flex-direction: column;
+  }
+
+  .difficulty-tick {
+    font-size: 0.72rem;
   }
 
   @media (max-width: 520px) {
