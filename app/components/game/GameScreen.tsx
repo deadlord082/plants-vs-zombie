@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent, type ReactNode } from "react";
 import {
   INITIAL_SUN,
   PLANT_SPECS,
@@ -475,6 +475,7 @@ export default function GameScreen() {
   const coinBalanceRef = useRef<HTMLDivElement | null>(null);
   const sunCounterRef = useRef<HTMLDivElement | null>(null);
   const explosionEffectsRef = useRef<ExplosionEffect[]>([]);
+  const cheatCodeBufferRef = useRef("");
 
   useEffect(() => {
     const timeout = window.setTimeout(() => {
@@ -978,6 +979,51 @@ export default function GameScreen() {
     playerDataRef.current = nextData;
     setPlayerData(nextData);
   };
+
+  const activateCheatCode = useCallback(() => {
+    const completedLevels = Array.from(new Set([
+      ...playerDataRef.current.completedLevels,
+      ...LEVELS.map((level) => level.id),
+    ]));
+    const levelTrophies = {
+      ...playerDataRef.current.levelTrophies,
+      ...Object.fromEntries(LEVELS.map((level) => [level.id, "impossible" as const])),
+    };
+    const nextData: PlayerData = {
+      ...playerDataRef.current,
+      money: 99999,
+      unlockedPlants: Array.from(new Set([...playerDataRef.current.unlockedPlants, ...BASE_PLANT_TYPES])),
+      completedLevels,
+      difficulty: "impossible",
+      levelTrophies,
+      gloveUnlocked: playerDataRef.current.gloveUnlocked || LEVELS.some((level) => level.reward?.glove),
+    };
+    playerDataRef.current = nextData;
+    setPlayerData(nextData);
+  }, []);
+
+  useEffect(() => {
+    cheatCodeBufferRef.current = "";
+    if (phase !== "menu" || !playerDataLoaded) return;
+
+    const cheatCode = "iamthelord";
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.ctrlKey || event.altKey || event.metaKey) return;
+      if (!/^[a-z]$/i.test(event.key)) {
+        cheatCodeBufferRef.current = "";
+        return;
+      }
+
+      cheatCodeBufferRef.current = `${cheatCodeBufferRef.current}${event.key.toLowerCase()}`.slice(-cheatCode.length);
+      if (cheatCodeBufferRef.current === cheatCode) {
+        cheatCodeBufferRef.current = "";
+        activateCheatCode();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [activateCheatCode, phase, playerDataLoaded]);
 
   const handlePlacePlant = (row: number, col: number) => {
     if (phase !== "playing") return;
