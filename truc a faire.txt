@@ -1,19 +1,25 @@
 ----------------- truc a faire classé par importance -----------------------
 
 choper des vrais assets pour les projectiles des fusions.
-trouver un putain d'asset pour l'explosion de cherry bomb.
-faire un meilleur assets pour le trophy impossible + transform les fichier png en webp
-rajouter un lawnmower par niveaux qui se déclenche une fois dans la lane perdante.
-fix le gargantuars qui est trop large pour tenir sur une lane.
+faire un meilleur assets pour le trophy impossible
+??? rajouter un lawnmower par niveaux qui se déclenche une fois dans la lane perdante.
+??? fix le gargantuars qui est trop large pour tenir sur une lane.
 
 ajouter les trucs web pour le référencement + icons etc...
 
-choper asset destruction chomp-nut
+choper asset destruction chomp-nut et hypno-nut
 fix cherry nut pour quelle explose après chaque stade de destruction
 
-ajouter une surbrillance sur les plantes quand une fusion est disponible soit en deplacement soit en plantant
+fix le 12 lane lawn pour être vraiment de plus en plus difficile
+modif level pour ne plus fight le undying wraith de jour mais que de nuit et faire l inverse pour le pôle vaulter
+dégager les nuts zombie du niveau 10 ou 11 car le texte les introduisant est après.
+modifs le menu principal
+avec les modifications du menu principal mettre une image dans le fond pour le choix des catégories aussi et mettre le bon fond selon si on est dans la catégorie jour, nuit, etc
+modifs couleurs difficulté pour avoir vert, jaune, orange, rouge
+fusion à regarder sur le wiki de pvz fusion : comet-shroom, cherry pop
+Check aussi pour ajouter doom shroom à obtenir
 
-rajouter une réduction sur la prod de sun si meme le slider de difficultés est pas suffissant
+ajouter des niveaux wall-nut bowling, conveyor, prepare you're defense level.
 
 rajouter des sonds / musiques.
 rajouter des tiles / les utiliser dans les nouveaux niveaux
@@ -29,6 +35,15 @@ idée zombie : football zombie, torch zombie
 et jouer sur les tiles aussi : 
 burn tile -> deal 20 damage every tick (on plants and zombie),
 sun tile -> upgrade sun generated on the tile
-ajouter des tiles avec des trucs dessus genre statue qui bloc les projectiles ou les zombies
 attack speed tile / health upgrade tile / damage tile / ...
-fume + fume = gloom
+
+Bugs :
+- i want to allow multiple plants for the challenges usePlant
+- the challenge killZombiesWithin should be done during the level and not from the start. like the player has to kill 5 zombie in 10sec but this apply to all the level duration. the player doesn't have to kill 5 zombies in the first 10sec it's more like every zombie kill is registered for 10sec and if there is 10 of them active then the challenge complete. 
+- i want to have an in-game indicator for the challenge that will look like tag for each challenges on the level under the player gameplay bar.
+the tags will have a semi transparent black background with white text and becoming green if there are valid.
+produceSun text will be like this (valid when sunProduced => sunNeeded) : {sunProduced} / {sunNeeded} {/public/other/sun}
+maxSunSpent text will be like this : {sunSpent} / {maxSunSpent} {/public/other/sun}
+maxPlantsLost text will be like this : {plantLeftBeforeLosing} plant left
+usePlant doesn't have a tag
+killZombiesWithin text will be like this (valid when zombieKilledWithin => killNeeded at least once): {zombieKilledWithin} / {killNeeded} {/public/zombie/basic-head}

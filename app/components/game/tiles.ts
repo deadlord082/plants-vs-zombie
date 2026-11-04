@@ -1,4 +1,4 @@
-export type TileType = "normal" | "normalDark" | "obstructed" | "sunflowerStatue";
+export type TileType = "normal" | "normalDark" | "obstructed" | "sunflowerStatue" | "sunShroomStatue" | "grave";
 
 export interface TileDefinition {
   key: TileType;
@@ -30,10 +30,24 @@ export const TILE_DEFINITIONS: Record<TileType, TileDefinition> = {
   },
   sunflowerStatue: {
     key: "sunflowerStatue",
-    canPlant: true,
-    className: "bg-lime-700/80 hover:bg-lime-600/90",
-    description: "A sunflower statue blocks planting, zombies, and plant projectiles until destroyed.",
+    canPlant: false,
+    className: "cursor-not-allowed bg-lime-700/80",
+    description: "A sunflower statue blocks planting, zombies, and plant projectiles until destroyed by a Grave Buster.",
     label: "Sunflower statue",
+  },
+  sunShroomStatue: {
+    key: "sunShroomStatue",
+    canPlant: false,
+    className: "cursor-not-allowed bg-lime-700/80",
+    description: "A Sun-shroom statue blocks planting, zombies, and plant projectiles until destroyed by a Grave Buster.",
+    label: "Sun-shroom statue",
+  },
+  grave: {
+    key: "grave",
+    canPlant: false,
+    className: "cursor-not-allowed bg-stone-700/90",
+    description: "A gravestone blocks planting and spawns a random zombie during each boss wave until destroyed by a Grave Buster.",
+    label: "Gravestone",
   },
 };
 

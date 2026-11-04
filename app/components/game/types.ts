@@ -1,8 +1,15 @@
-export type BasePlantTypeKey = "sunflower" | "peaShooter" | "wallNut" | "chomper" | "cherryBomb" | "icebergLettuce";
-export type FusionPlantTypeKey = "peanut" | "sunNut" | "tallNut" | "chompNut" | "explodeONut" | "twinSunflower" | "sunBomb" | "sunChomper" | "sunshooter" | "repeater" | "chompShooter" | "cherryBomber" | "cherryChomper" | "frozenCherry" | "snowPeashooter" | "frostNut";
+export type BasePlantTypeKey = "sunflower" | "peaShooter" | "wallNut" | "chomper" | "cherryBomb" | "icebergLettuce" | "puffShroom" | "fumeShroom" | "hypnoShroom" | "graveBuster";
+export type FusionPlantTypeKey = "peanut" | "sunNut" | "tallNut" | "chompNut" | "explodeONut" | "twinSunflower" | "sunBomb" | "sunChomper" | "sunshooter" | "repeater" | "chompShooter" | "cherryBomber" | "cherryChomper" | "frozenCherry" | "snowPeashooter" | "frostNut" | "sunShroom" | "nibbleShroom" | "peaShroom" | "miniNutShroom" | "miniIceShroom" | "miniHypnoShroom" | "brightShroom" | "gluttonShroom" | "triggerShroom" | "rushShroom" | "fumeNut" | "frostShroom" | "perfumeShroom" | "gloomShroom" | "hypnoChomper" | "hypnoNut" | "hypnoPea" | "cryonicShroom" | "catalystShroom" | "empressShroom" | "iceChomper" | "chomperMaw" | "iceShroom";
 export type PlantTypeKey = BasePlantTypeKey | FusionPlantTypeKey;
 export type LevelCategory = "day" | "night" | "pool" | "fog" | "roof" | "mini-game";
 export type GamePhase = "menu" | "category-select" | "level-select" | "shop" | "almanac" | "credits" | "loadout" | "playing" | "complete";
+export type LevelChallenge =
+  | { type: "produceSun"; amount: number }
+  | { type: "maxSunSpent"; amount: number }
+  | { type: "maxPlantsLost"; amount: number }
+  | { type: "maxPlantsOnLawn"; amount: number }
+  | { type: "usePlant"; plants: BasePlantTypeKey[] }
+  | { type: "killZombiesWithin"; count: number; seconds: number };
 import type { TileType } from "./tiles";
 
 export interface LevelReward {
@@ -18,6 +25,7 @@ export interface LevelConfig {
   title: string;
   description: string;
   introTexts?: string[];
+  challenges?: LevelChallenge[];
   backgroundImage?: string;
   musicTrack?: string;
   preWaveCount: number;
@@ -68,6 +76,30 @@ export interface PlantSpec {
   freezeOnHit?: boolean;
   triggerExplosion?: boolean;
   blocksPoleVault?: boolean;
+  plantImage?: string;
+  puffStack?: boolean;
+  projectileRange?: number;
+  fumeAttackRange?: number;
+  fumeAttackRadius?: number;
+  fumeAttack?: boolean;
+  fumeBlastDamage?: number;
+  fumeFreezeDurationMs?: number;
+  animationDurationMs?: number;
+  generationGrowthMs?: number;
+  generationGrowthAmount?: number;
+  hypnotizeChance?: number;
+  hypnotizedHpMultiplier?: number;
+  hypnotizedVisualScale?: number;
+  hypnotizeOnBite?: boolean;
+  hypnotizeOnEat?: boolean;
+  hypnotizeFreezes?: boolean;
+  deathExplosionOnHypnotize?: boolean;
+  spawnedHypnotizedZombieMs?: number;
+  eatHpLimit?: number;
+  eatOnce?: boolean;
+  jumpAttack?: boolean;
+  attackFreezeDurationMs?: number;
+  freezeAllZombies?: boolean;
 }
 
 export interface PlantInstance {
@@ -87,13 +119,23 @@ export interface PlantInstance {
   pendingShots?: number;
   nextPendingShotAt?: number;
   nextSunValue?: number;
+  obstacleDestroyAt?: number;
+  jumpStartedAt?: number;
+  jumpTargetX?: number;
+  hasEaten?: boolean;
+  nextAnimationShotAt?: number;
+  fumeAnimatingUntil?: number;
+  jumpAttack?: boolean;
+  jumpHitZombieIds?: string[];
 }
 
 export interface StatueInstance {
   id: string;
   row: number;
   col: number;
-  hp: number;
+  type: "sunflowerStatue" | "sunShroomStatue" | "grave";
+  hp?: number;
+  image?: string;
 }
 
 export interface ZombieInstance {
@@ -118,6 +160,15 @@ export interface ZombieInstance {
   poleVaultStartX?: number;
   poleVaultTargetX?: number;
   frozenUntil?: number;
+  hypnotized?: boolean;
+  hypnotizedHpMultiplier?: number;
+  hypnotizedStatMultiplier?: number;
+  hypnotizedVisualScale?: number;
+  hypnoDeathExplosion?: boolean;
+  freezingAttacks?: boolean;
+  ignoredPlantIds?: string[];
+  nextAttackTargetId?: string;
+  visualY?: number;
 }
 
 export interface Projectile {
@@ -133,6 +184,17 @@ export interface Projectile {
   sunOnKill?: number;
   launchAt?: number;
   freezeDurationMs?: number;
+  maxX?: number;
+  visualOnly?: boolean;
+  speedPerTick?: number;
+  speedXPerTick?: number;
+  speedYPerTick?: number;
+  visualY?: number;
+  originX?: number;
+  originY?: number;
+  maxDistance?: number;
+  expiresAt?: number;
+  hypnotizeChance?: number;
 }
 
 export interface SunInstance {
@@ -172,4 +234,6 @@ export interface ZombieProjectile {
   row: number;
   x: number;
   damage: number;
+  direction: -1 | 1;
+  hypnotized?: boolean;
 }

@@ -13,11 +13,11 @@ export const LEVEL_2: LevelDefinition = {
   skySunIntervalMs: 10000,
   reward: { money: 100 },
   tiles: [
-    ["normal", "normalDark", "normal", "normalDark", "normal", "normalDark", "normal", "normal"],
+    ["normal", "normalDark", "normal", "normalDark", "normal", "normalDark", "normal", "normalDark"],
     ["normalDark", "normal", "normalDark", "normal", "normalDark", "normal", "normalDark", "normal"],
-    ["normal", "normalDark", "normal", "normalDark", "normal", "normalDark", "normal", "normal"],
+    ["normal", "normalDark", "normal", "normalDark", "normal", "normalDark", "normal", "normalDark"],
     ["normalDark", "normal", "normalDark", "normal", "normalDark", "normal", "normalDark", "normal"],
-    ["normal", "normalDark", "normal", "normalDark", "normal", "normalDark", "normal", "normal"],
+    ["normal", "normalDark", "normal", "normalDark", "normal", "normalDark", "normal", "normalDark"],
   ],
   // Each wave batch spawns together; boss waves use the boss spawn timing.
   waves: [

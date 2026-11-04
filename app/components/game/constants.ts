@@ -16,13 +16,13 @@ export const SUNFLOWER_ARC_DURATION_MS = 1400;
 export const SUNFLOWER_ARC_HEIGHT_TILES = 0.275;
 export const PEASHOOTER_SHOOT_MS = 1500;
 export const CHOMPER_BITE_MS = 1500;
-export const CHOMPER_SLEEP_MS = 10000;
+export const CHOMPER_SLEEP_MS = 20000;
 export const CHERRY_BOMB_FUSE_MS = 2000;
 export const ICEBERG_LETTUCE_FUSE_MS = 1000;
 export const PROJECTILE_SPEED_PER_TICK = 0.8;
 export const GAME_TICK_MS = 200;
 
-export const BASE_PLANT_TYPES: BasePlantTypeKey[] = ["sunflower", "peaShooter", "wallNut", "chomper", "cherryBomb", "icebergLettuce"];
+export const BASE_PLANT_TYPES: BasePlantTypeKey[] = ["sunflower", "peaShooter", "wallNut", "chomper", "cherryBomb", "icebergLettuce", "puffShroom", "fumeShroom", "hypnoShroom", "graveBuster"];
 
 export const PLANT_SPECS: Record<PlantTypeKey, PlantSpec> = {
   sunflower: {
@@ -58,7 +58,7 @@ export const PLANT_SPECS: Record<PlantTypeKey, PlantSpec> = {
     key: "chomper",
     name: "Chomper",
     hp: 300,
-    cost: 100,
+    cost: 150,
     rechargeMs: 10000,
     summary: "Eats zombies with 200 HP or less, or bites tougher zombies in the next tile for 40 damage.",
     damage: 40,
@@ -67,7 +67,7 @@ export const PLANT_SPECS: Record<PlantTypeKey, PlantSpec> = {
   cherryBomb: {
     key: "cherryBomb",
     name: "Cherry Bomb",
-    hp: 1,
+    hp: 300,
     cost: 150,
     rechargeMs: 20000,
     summary: "Explodes after 2 seconds, dealing 1,000 damage to every zombie in a 3x3 area.",
@@ -79,10 +79,31 @@ export const PLANT_SPECS: Record<PlantTypeKey, PlantSpec> = {
     hp: 300,
     cost: 25,
     rechargeMs: 15000,
-    summary: "Waits for a zombie, then freezes every zombie in its tile for 5 seconds.",
-    freezeDurationMs: 5000,
+    summary: "Waits for a zombie, then freezes every zombie in its tile for 10 seconds.",
+    freezeDurationMs: 10000,
     freezeOnContact: true,
     triggerExplosion: true,
+  },
+  puffShroom: {
+    key: "puffShroom", name: "Puff-shroom", hp: 80, cost: 0, rechargeMs: 5000,
+    summary: "A free short-range shooter. Its spores reach up to three tiles and deal 5 damage.",
+    damage: 5, shootMs: PEASHOOTER_SHOOT_MS, projectileImage: "/plants/spore2.webp",
+    projectileRange: 3, puffStack: true,
+  },
+  fumeShroom: {
+    key: "fumeShroom", name: "Fume-shroom", hp: 300, cost: 125, rechargeMs: 10000,
+    summary: "Fires every 2 seconds, damaging all zombies from its tile through five tiles ahead.",
+    damage: 30, shootMs: 2000, fumeAttack: true, fumeAttackRange: 5, animationDurationMs: 500,
+  },
+  hypnoShroom: {
+    key: "hypnoShroom", name: "Hypno-shroom", hp: 300, cost: 100, rechargeMs: 10000,
+    summary: "Converts a zombie that bites it into an ally, unless that attack destroys it.",
+    hypnotizeOnBite: true,
+  },
+  graveBuster: {
+    key: "graveBuster", name: "Grave Buster", hp: 300, cost: 50, rechargeMs: 15000,
+    summary: "Consumes a statue or gravestone over five seconds. It can only be planted on an obstacle.",
+    plantImage: "/plants/grave-buster.webp",
   },
   peanut: {
     key: "peanut",
@@ -148,7 +169,7 @@ export const PLANT_SPECS: Record<PlantTypeKey, PlantSpec> = {
     fusionOf: ["sunflower", "sunflower"],
   },
   sunBomb: {
-    key: "sunBomb", name: "Sun Bomb", hp: 1, cost: 0, rechargeMs: 0,
+    key: "sunBomb", name: "Sun Bomb", hp: 300, cost: 0, rechargeMs: 0,
     summary: "A Sunflower fused with a Cherry Bomb. Zombies killed by its blast become 25 sun.",
     damage: 1000, fusionOf: ["sunflower", "cherryBomb"],
   },
@@ -187,7 +208,7 @@ export const PLANT_SPECS: Record<PlantTypeKey, PlantSpec> = {
     damage: 40, shootMs: PEASHOOTER_SHOOT_MS, eatExplosionDamage: 200, fusionOf: ["cherryBomb", "chomper"],
   },
   frozenCherry: {
-    key: "frozenCherry", name: "Frozen Cherry", hp: 1, cost: 0, rechargeMs: 0,
+    key: "frozenCherry", name: "Frozen Cherry", hp: 300, cost: 0, rechargeMs: 0,
     summary: "An Iceberg Lettuce fused with a Cherry Bomb. It explodes in a 3x3 area and freezes zombies.",
     damage: 1000, freezeDurationMs: 5000, freezeOnContact: true, triggerExplosion: true,
     fusionOf: ["cherryBomb", "icebergLettuce"],
@@ -196,12 +217,148 @@ export const PLANT_SPECS: Record<PlantTypeKey, PlantSpec> = {
     key: "snowPeashooter", name: "Snow Peashooter", hp: 300, cost: 0, rechargeMs: 0,
     summary: "An Iceberg Lettuce fused with a Pea Shooter. Its snow peas deal 20 damage and freeze zombies for 1 second.",
     damage: 20, shootMs: PEASHOOTER_SHOOT_MS, projectileImage: "/plants/snow-pea-projectile.webp", freezeOnHit: true,
-    freezeDurationMs: 1000, fusionOf: ["peaShooter", "icebergLettuce"],
+    freezeDurationMs: 2000, fusionOf: ["peaShooter", "icebergLettuce"],
   },
   frostNut: {
     key: "frostNut", name: "Frost-nut", hp: 4000, cost: 0, rechargeMs: 0,
     summary: "An Iceberg Lettuce fused with a Wall-nut. Zombies that bite it are frozen for 5 seconds.",
     freezeOnContact: true, freezeDurationMs: 5000, fusionOf: ["wallNut", "icebergLettuce"],
+  },
+  iceShroom: {
+    key: "iceShroom", name: "Ice-shroom", hp: 300, cost: 0, rechargeMs: 0,
+    summary: "Waits for a zombie, then freezes every zombie on the lawn for 10 seconds.",
+    freezeDurationMs: 10000, freezeOnContact: true, triggerExplosion: true, freezeAllZombies: true,
+    plantImage: "/plants/Ice-shroom.webp", fusionOf: ["icebergLettuce", "icebergLettuce"],
+  },
+  sunShroom: {
+    key: "sunShroom", name: "Sun-shroom", hp: 80, cost: 0, rechargeMs: 0,
+    summary: "A Puff-shroom-sized sun producer. It gives 25 sun per burst, increasing to 50 after 100 seconds.",
+    generateAmount: 25, generateMs: SUNFLOWER_GENERATION_MS, firstBurstMs: SUNFLOWER_FIRST_BURST_MS,
+    generationGrowthMs: 100000, generationGrowthAmount: 50, puffStack: true, plantImage: "/plants/sun-shroom.webp",
+    fusionOf: ["puffShroom", "sunflower"],
+  },
+  nibbleShroom: {
+    key: "nibbleShroom", name: "Nibble-shroom", hp: 80, cost: 0, rechargeMs: 0,
+    summary: "Jumps through nearby zombies for 80 damage, then lets the triggered zombies pass by.",
+    puffStack: true, jumpAttack: true, damage: 80, shootMs: PEASHOOTER_SHOOT_MS,
+    plantImage: "/plants/nibble-shroom.webp", fusionOf: ["chomper", "puffShroom"],
+  },
+  peaShroom: {
+    key: "peaShroom", name: "Pea-shroom", hp: 80, cost: 0, rechargeMs: 0,
+    summary: "A small Puff-shroom that fires 10-damage peas.",
+    damage: 10, shootMs: PEASHOOTER_SHOOT_MS, projectileDamage: 10, puffStack: true,
+    plantImage: "/plants/pea-shroom.webp", fusionOf: ["peaShooter", "puffShroom"],
+  },
+  miniNutShroom: {
+    key: "miniNutShroom", name: "Mini-nut-shroom", hp: 1000, cost: 0, rechargeMs: 0,
+    summary: "A Puff-shroom-sized defensive plant with 1,000 HP.",
+    puffStack: true, plantImage: "/plants/mini-Nut-shroom.webp", fusionOf: ["puffShroom", "wallNut"],
+  },
+  miniIceShroom: {
+    key: "miniIceShroom", name: "Mini-ice-shroom", hp: 80, cost: 0, rechargeMs: 0,
+    summary: "A small Puff-shroom that freezes the zombie that touches it after a 0.4-second fuse.",
+    puffStack: true, triggerExplosion: true, freezeOnContact: true, freezeDurationMs: 5000,
+    plantImage: "/plants/mini-ice-shroom.webp", fusionOf: ["icebergLettuce", "puffShroom"],
+  },
+  miniHypnoShroom: {
+    key: "miniHypnoShroom", name: "Mini-hypno-shroom", hp: 80, cost: 0, rechargeMs: 0,
+    summary: "Converts a zombie that bites it into an ally with one-quarter of its usual stats.",
+    puffStack: true, hypnotizeOnBite: true, hypnotizedHpMultiplier: 0.25, hypnotizedVisualScale: 0.7,
+    plantImage: "/plants/mini-hypno-shroom.webp", fusionOf: ["hypnoShroom", "puffShroom"],
+  },
+  brightShroom: {
+    key: "brightShroom", name: "Bright-shroom", hp: 300, cost: 0, rechargeMs: 0,
+    summary: "Produces 200 sun every 45 seconds, with its first burst after 10 seconds.",
+    generateAmount: 200, generateMs: 45000, firstBurstMs: SUNFLOWER_FIRST_BURST_MS,
+    plantImage: "/plants/bright-shroom.png", fusionOf: ["fumeShroom", "sunflower"],
+  },
+  gluttonShroom: {
+    key: "gluttonShroom", name: "Glutton-shroom", hp: 300, cost: 0, rechargeMs: 0,
+    summary: "A Fume-shroom that can eat one nearby weak zombie; afterward it deals 60 damage twice as often.",
+    damage: 30, shootMs: 2000, fumeAttack: true, fumeAttackRange: 5, animationDurationMs: 500,
+    eatOnce: true, eatHpLimit: 200, plantImage: "/plants/glutton-shroom.png", fusionOf: ["chomper", "fumeShroom"],
+  },
+  triggerShroom: {
+    key: "triggerShroom", name: "Trigger-shroom", hp: 300, cost: 0, rechargeMs: 0,
+    summary: "Each zombie hit by its Fume-shroom attack triggers an additional 10-damage blast nearby.",
+    damage: 30, shootMs: 2000, fumeAttack: true, fumeAttackRange: 5, animationDurationMs: 500,
+    fumeBlastDamage: 10, plantImage: "/plants/trigger-shroom.webp", fusionOf: ["cherryBomb", "fumeShroom"],
+  },
+  rushShroom: {
+    key: "rushShroom", name: "Rush-shroom", hp: 300, cost: 0, rechargeMs: 0,
+    summary: "A Fume-shroom that attacks every 1.14 seconds with a shorter spore animation.",
+    damage: 30, shootMs: 2000, fireRateMultiplier: 1 / 1.75, fumeAttack: true, fumeAttackRange: 5,
+    animationDurationMs: 375, plantImage: "/plants/rush-shroom.webp", fusionOf: ["fumeShroom", "peaShooter"],
+  },
+  fumeNut: {
+    key: "fumeNut", name: "Fume-nut", hp: 6000, cost: 0, rechargeMs: 0,
+    summary: "A durable Wall-nut with 6,000 HP.",
+    plantImage: "/plants/fume-nut.webp", fusionOf: ["fumeShroom", "wallNut"],
+  },
+  frostShroom: {
+    key: "frostShroom", name: "Frost-shroom", hp: 300, cost: 0, rechargeMs: 0,
+    summary: "A Fume-shroom that freezes every zombie hit for one second.",
+    damage: 30, shootMs: 2000, fumeAttack: true, fumeAttackRange: 5, fumeFreezeDurationMs: 1000,
+    animationDurationMs: 500, plantImage: "/plants/frost-shroom.webp", fusionOf: ["fumeShroom", "icebergLettuce"],
+  },
+  perfumeShroom: {
+    key: "perfumeShroom", name: "Perfume-shroom", hp: 300, cost: 0, rechargeMs: 0,
+    summary: "Each Fume-shroom attack has a 3% chance to hypnotize each zombie it hits.",
+    damage: 30, shootMs: 2000, fumeAttack: true, fumeAttackRange: 5, hypnotizeChance: 0.03,
+    animationDurationMs: 500, plantImage: "/plants/perfume-shroom.webp", fusionOf: ["fumeShroom", "hypnoShroom"],
+  },
+  gloomShroom: {
+    key: "gloomShroom", name: "Gloom-shroom", hp: 300, cost: 0, rechargeMs: 0,
+    summary: "Deals 50 damage every second to zombies in a 3-by-3 area while releasing spores in eight directions.",
+    damage: 50, shootMs: 1000, fumeAttack: true, fumeAttackRange: 1, fumeAttackRadius: 1, animationDurationMs: 500,
+    plantImage: "/plants/gloom-shroom.webp", fusionOf: ["fumeShroom", "fumeShroom"],
+  },
+  hypnoChomper: {
+    key: "hypnoChomper", name: "Hypno-chomper", hp: 300, cost: 0, rechargeMs: 0,
+    summary: "Eats weak zombies like a Chomper and returns them to battle as allies.",
+    damage: 40, shootMs: PEASHOOTER_SHOOT_MS, hypnotizeOnEat: true,
+    plantImage: "/plants/hypno-chomper.webp", fusionOf: ["chomper", "hypnoShroom"],
+  },
+  hypnoNut: {
+    key: "hypnoNut", name: "Hypno-nut", hp: 4000, cost: 0, rechargeMs: 0,
+    summary: "A Wall-nut that has a 3% chance to hypnotize a zombie each time it is attacked.",
+    hypnotizeChance: 0.03, plantImage: "/plants/hypno-nut.webp", fusionOf: ["hypnoShroom", "wallNut"],
+  },
+  hypnoPea: {
+    key: "hypnoPea", name: "Hypno-pea", hp: 300, cost: 0, rechargeMs: 0,
+    summary: "A Pea Shooter whose peas have a 3% chance to hypnotize the zombie they hit.",
+    damage: 20, shootMs: PEASHOOTER_SHOOT_MS, hypnotizeChance: 0.03,
+    plantImage: "/plants/hypno-pea.webp", fusionOf: ["hypnoShroom", "peaShooter"],
+  },
+  cryonicShroom: {
+    key: "cryonicShroom", name: "Cryonic-shroom", hp: 300, cost: 0, rechargeMs: 0,
+    summary: "Hypnotizes the zombie that bites it and freezes it for five seconds.",
+    hypnotizeOnBite: true, hypnotizeFreezes: true,
+    plantImage: "/plants/cryonic-shroom.webp", fusionOf: ["hypnoShroom", "icebergLettuce"],
+  },
+  catalystShroom: {
+    key: "catalystShroom", name: "Catalyst-shroom", hp: 300, cost: 0, rechargeMs: 0,
+    summary: "Hypnotizes the zombie that bites it; that zombie explodes for 1,000 damage when defeated.",
+    hypnotizeOnBite: true, deathExplosionOnHypnotize: true,
+    plantImage: "/plants/catalyst-shroom.png", fusionOf: ["cherryBomb", "hypnoShroom"],
+  },
+  empressShroom: {
+    key: "empressShroom", name: "Empress-shroom", hp: 300, cost: 0, rechargeMs: 0,
+    summary: "Hypnotizes attackers and summons a random allied zombie every 30 seconds.",
+    hypnotizeOnBite: true, spawnedHypnotizedZombieMs: 30000,
+    plantImage: "/plants/empress-shroom.webp", fusionOf: ["hypnoShroom", "hypnoShroom"],
+  },
+  iceChomper: {
+    key: "iceChomper", name: "Ice-chomper", hp: 300, cost: 0, rechargeMs: 0,
+    summary: "Eats weak zombies and freezes every other zombie on the lawn for two seconds.",
+    damage: 40, shootMs: PEASHOOTER_SHOOT_MS, eatHpLimit: 200, attackFreezeDurationMs: 2000,
+    plantImage: "/plants/ice-chomper.webp", fusionOf: ["chomper", "icebergLettuce"],
+  },
+  chomperMaw: {
+    key: "chomperMaw", name: "Chomper Maw", hp: 300, cost: 0, rechargeMs: 0,
+    summary: "A Chomper that bites for 80 damage and eats zombies with up to 1,000 HP.",
+    damage: 80, shootMs: PEASHOOTER_SHOOT_MS, eatHpLimit: 1000,
+    plantImage: "/plants/chomper_maw.webp", fusionOf: ["chomper", "chomper"],
   },
 };
 
@@ -222,6 +379,29 @@ export const FUSION_RECIPES: Record<string, PlantTypeKey> = {
   "cherryBomb+icebergLettuce": "frozenCherry",
   "icebergLettuce+peaShooter": "snowPeashooter",
   "icebergLettuce+wallNut": "frostNut",
+  "icebergLettuce+icebergLettuce": "iceShroom",
+  "puffShroom+sunflower": "sunShroom",
+  "chomper+puffShroom": "nibbleShroom",
+  "peaShooter+puffShroom": "peaShroom",
+  "puffShroom+wallNut": "miniNutShroom",
+  "icebergLettuce+puffShroom": "miniIceShroom",
+  "hypnoShroom+puffShroom": "miniHypnoShroom",
+  "fumeShroom+sunflower": "brightShroom",
+  "chomper+fumeShroom": "gluttonShroom",
+  "cherryBomb+fumeShroom": "triggerShroom",
+  "fumeShroom+peaShooter": "rushShroom",
+  "fumeShroom+wallNut": "fumeNut",
+  "fumeShroom+icebergLettuce": "frostShroom",
+  "fumeShroom+hypnoShroom": "perfumeShroom",
+  "fumeShroom+fumeShroom": "gloomShroom",
+  "chomper+hypnoShroom": "hypnoChomper",
+  "hypnoShroom+wallNut": "hypnoNut",
+  "hypnoShroom+peaShooter": "hypnoPea",
+  "hypnoShroom+icebergLettuce": "cryonicShroom",
+  "cherryBomb+hypnoShroom": "catalystShroom",
+  "hypnoShroom+hypnoShroom": "empressShroom",
+  "chomper+icebergLettuce": "iceChomper",
+  "chomper+chomper": "chomperMaw",
 };
 
 export interface ZombieSpec {

@@ -11,16 +11,25 @@ export const LEVEL_test: LevelDefinition = {
   waveSpawnIntervalMs: 1200,
   skySunIntervalMs: 1000,
   gloveRechargeMs: 0,
+  challenges: [
+    { type: "produceSun", amount: 50 },
+    { type: "maxSunSpent", amount: 150 },
+    { type: "maxPlantsLost", amount: 1 },
+    { type: "maxPlantsOnLawn", amount: 4 },
+    { type: "usePlant", plants: ["peaShooter", "wallNut", "sunflower"] },
+    { type: "killZombiesWithin", count: 1, seconds: 10 },
+  ],
   tiles: [
-    ["normal", "normalDark", "normal", "normalDark", "normal", "sunflowerStatue", "normal", "normalDark"],
-    ["normalDark", "normal", "normalDark", "normal", "normalDark", "sunflowerStatue", "normalDark", "normal"],
-    ["normal", "normalDark", "normal", "normalDark", "normal", "sunflowerStatue", "normal", "normalDark"],
-    ["normalDark", "normal", "normalDark", "normal", "normalDark", "sunflowerStatue", "normalDark", "normal"],
-    ["normal", "normalDark", "normal", "normalDark", "normal", "sunflowerStatue", "normal", "normalDark"],
-    ["normalDark", "normal", "normalDark", "normal", "normalDark", "sunflowerStatue", "normalDark", "normal"],
+    ["normal", "normalDark", "normal", "normalDark", "normal", "normalDark", "normal", "normalDark"],
+    ["normalDark", "normal", "normalDark", "normal", "normalDark", "normal", "normalDark", "normal"],
+    ["normal", "normalDark", "normal", "normalDark", "normal", "normalDark", "grave", "normalDark"],
+    ["normalDark", "normal", "normalDark", "normal", "normalDark", "normal", "normalDark", "normal"],
+    ["normal", "normalDark", "normal", "normalDark", "normal", "normalDark", "normal", "normalDark"],
+    ["normalDark", "normal", "normalDark", "normal", "normalDark", "normal", "normalDark", "normal"],
   ],
   // Each wave batch spawns together; boss waves use the boss spawn timing.
   waves: [
-    { zombies: [{ type: "poleVaulting", count: 2 }] },
+    { zombies: [{ type: "basic", count: 1 }] },
+    { zombies: [{ type: "peashooterZombie", count: 1 }] },
   ],
 };

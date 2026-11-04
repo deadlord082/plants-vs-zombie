@@ -3,7 +3,7 @@
  */
 
 import type { TileType } from "../tiles";
-import type { LevelCategory, LevelReward } from "../types";
+import type { LevelCategory, LevelChallenge, LevelReward } from "../types";
 
 export interface ZombieSpawn {
   type: "basic" | "imp" | "cone" | "bucket" | "gargantuar" | "wallNutZombie" | "peashooterZombie" | "horseman" | "undyingWraith" | "poleVaulting";
@@ -31,6 +31,7 @@ export interface LevelDefinition {
   skySunIntervalMs?: number;
   gloveRechargeMs?: number;
   reward?: LevelReward;
+  challenges?: LevelChallenge[];
   tiles: TileType[][];
   // Each wave spawns together unless it is marked as a boss wave.
   waves: WaveDefinition[];
@@ -55,6 +56,7 @@ export interface CompiledLevelConfig {
   skySunIntervalMs?: number;
   gloveRechargeMs: number;
   reward?: LevelReward;
+  challenges?: LevelChallenge[];
   tiles: TileType[][];
   // Total pre-wave zombies
   preWaveCount: number;
