@@ -482,11 +482,11 @@ export const ZOMBIE_SPECS: Record<string, ZombieSpec> = {
   },
   horseman: {
     key: "horseman", name: "Zombie Horseman", summary: "A fast zombie that runs twice as quickly as a Basic Zombie.", coinDropChance: 0.01,
-    hp: 1200, moveMs: ZOMBIE_MOVE_MS / 2, attackMs: ZOMBIE_ATTACK_MS, damage: 50, armor: 0,
+    hp: 800, moveMs: Math.round(ZOMBIE_MOVE_MS / 3), attackMs: ZOMBIE_ATTACK_MS, damage: 50, armor: 0,
   },
   undyingWraith: {
     key: "undyingWraith", name: "Undying Wraith", summary: "A ghostly zombie that passes through plants without attacking them.", coinDropChance: 0.01,
-    hp: ZOMBIE_HP, moveMs: ZOMBIE_MOVE_MS, attackMs: ZOMBIE_ATTACK_MS, damage: 50, armor: 0,
+    hp: ZOMBIE_HP, moveMs: ZOMBIE_MOVE_MS / 2, attackMs: ZOMBIE_ATTACK_MS, damage: 50, armor: 0,
   },
   poleVaulting: {
     key: "poleVaulting", name: "Pole Vaulting Zombie", summary: "Runs like an Imp, vaults over the first plant, then walks at Basic Zombie speed.", coinDropChance: 0.01,

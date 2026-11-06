@@ -13,6 +13,8 @@ export const LEVEL_TUTO: LevelDefinition = {
   betweenWaveDelayMs: 3000,
   waveSpawnIntervalMs: 1200,
   skySunIntervalMs: 10000,
+  backgroundImage: "/other/bg-day.webp",
+  musicTrack: "/sound/day.mp3",
   reward: { unlockPlants: ["sunflower"] },
   tiles: [
     ["normal", "normalDark", "normal", "normalDark", "normal", "normalDark", "normal", "normalDark"],

@@ -10,6 +10,8 @@ export const LEVEL_6: LevelDefinition = {
     betweenWaveDelayMs: 3000,
     waveSpawnIntervalMs: 1200,
     skySunIntervalMs: 10000,
+    backgroundImage: "/other/bg-day.webp",
+    musicTrack: "/sound/day.mp3",
     reward: { unlockPlants: ["chomper"] },
     tiles: [
         ["normal", "normalDark", "normal", "normalDark", "normal", "normalDark", "normal", "normalDark"],

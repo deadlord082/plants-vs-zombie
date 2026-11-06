@@ -17,6 +17,8 @@ export const LEVEL_11: LevelDefinition = {
     betweenWaveDelayMs: 4500,
     waveSpawnIntervalMs: 1000,
     skySunIntervalMs: 10000,
+    backgroundImage: "/other/bg-day.webp",
+    musicTrack: "/sound/day.mp3",
     reward: { money: 150 },
     tiles: [
         ["normal", "normalDark", "normal", "normalDark", "normal", "normalDark", "normal", "normalDark"],
@@ -34,6 +36,6 @@ export const LEVEL_11: LevelDefinition = {
         { zombies: [{ type: "basic", count: 5 }, { type: "cone", count: 2 }] },
         { zombies: [{ type: "imp", count: 4 }, { type: "cone", count: 3 }], bossWaves: true },
         { zombies: [{ type: "basic", count: 7 }, { type: "cone", count: 3 }] },
-        { zombies: [{ type: "imp", count: 8 }, { type: "cone", count: 5 }, { type: "wallNutZombie", count: 2 }], bossWaves: true },
+        { zombies: [{ type: "imp", count: 8 }, { type: "cone", count: 10 }, { type: "bucket", count: 10 }], bossWaves: true },
     ],
 };

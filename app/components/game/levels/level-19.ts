@@ -11,6 +11,8 @@ export const LEVEL_19: LevelDefinition = {
     betweenWaveDelayMs: 5500,
     waveSpawnIntervalMs: 750,
     skySunIntervalMs: 8000,
+    backgroundImage: "/other/bg-day.webp",
+    musicTrack: "/sound/day.mp3",
     reward: { money: 150 },
     tiles: [
         ["normal", "normalDark", "normal", "normalDark", "sunflowerStatue", "normalDark", "normal", "normalDark"],

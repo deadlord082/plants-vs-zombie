@@ -11,6 +11,8 @@ export const LEVEL_15: LevelDefinition = {
     betweenWaveDelayMs: 4500,
     waveSpawnIntervalMs: 800,
     skySunIntervalMs: 9000,
+    backgroundImage: "/other/bg-day.webp",
+    musicTrack: "/sound/day.mp3",
     reward: { unlockPlants: ["icebergLettuce"] },
     tiles: [
         ["normal", "normalDark", "normal", "normalDark", "normal", "normalDark", "normal", "normalDark"],

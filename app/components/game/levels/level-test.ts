@@ -10,6 +10,8 @@ export const LEVEL_test: LevelDefinition = {
   betweenWaveDelayMs: 3000,
   waveSpawnIntervalMs: 1200,
   skySunIntervalMs: 1000,
+  backgroundImage: "/other/bg-day.webp",
+  musicTrack: "/sound/day.mp3",
   gloveRechargeMs: 0,
   challenges: [
     { type: "produceSun", amount: 50 },
