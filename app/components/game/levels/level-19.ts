@@ -25,10 +25,10 @@ export const LEVEL_19: LevelDefinition = {
     waves: [
         { zombies: [{ type: "basic", count: 4 }] },
         { zombies: [{ type: "basic", count: 8 }, { type: "imp", count: 6 }] },
-        { zombies: [{ type: "basic", count: 10 }, { type: "imp", count: 8 }, { type: "undyingWraith", count: 2 }], bossWaves: true },
+        { zombies: [{ type: "basic", count: 10 }, { type: "imp", count: 8 }, { type: "poleVaulting", count: 2 }], bossWaves: true },
         { zombies: [{ type: "cone", count: 12 }, { type: "bucket", count: 4 }] },
-        { zombies: [{ type: "basic", count: 15 }, { type: "undyingWraith", count: 5 }, { type: "imp", count: 14 }, { type: "cone", count: 12 }], bossWaves: true },
+        { zombies: [{ type: "basic", count: 15 }, { type: "poleVaulting", count: 5 }, { type: "imp", count: 14 }, { type: "cone", count: 12 }], bossWaves: true },
         { zombies: [{ type: "bucket", count: 10 }, { type: "cone", count: 14 }, { type: "basic", count: 18 }] },
-        { zombies: [{ type: "bucket", count: 14 }, { type: "undyingWraith", count: 10 }, { type: "cone", count: 20 }, { type: "basic", count: 25 }], bossWaves: true }
+        { zombies: [{ type: "bucket", count: 14 }, { type: "poleVaulting", count: 10 }, { type: "cone", count: 20 }, { type: "basic", count: 25 }], bossWaves: true }
     ],
 };

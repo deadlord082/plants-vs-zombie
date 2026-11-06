@@ -1616,11 +1616,6 @@ body {
   font-weight: 900;
 }
 
-.difficulty-current-impossible {
-  background: #f5f0e3;
-  color: #171717;
-}
-
 .difficulty-selector input[type="range"] {
   display: block;
   width: 100%;
@@ -1635,14 +1630,14 @@ body {
   height: 0.45rem;
   border: 1px solid #38251b;
   border-radius: 999px;
-  background: linear-gradient(90deg, #58b947 0%, #ffffff 35%, #ed4545 68%, #171717 100%);
+  background: linear-gradient(90deg, #58b947 0%, #facc15 33.333%, #f97316 66.667%, #ef4444 100%);
 }
 
 .difficulty-selector input[type="range"]::-moz-range-track {
   height: 0.45rem;
   border: 1px solid #38251b;
   border-radius: 999px;
-  background: linear-gradient(90deg, #58b947 0%, #ffffff 35%, #ed4545 68%, #171717 100%);
+  background: linear-gradient(90deg, #58b947 0%, #facc15 33.333%, #f97316 66.667%, #ef4444 100%);
 }
 
 .difficulty-selector input[type="range"]::-webkit-slider-thumb {

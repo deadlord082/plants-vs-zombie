@@ -24,12 +24,14 @@ export const LEVEL_15: LevelDefinition = {
     ],
     waves: [
         { zombies: [{ type: "basic", count: 3 }] },
+        { zombies: [{ type: "poleVaulting", count: 1 }] },
         { zombies: [{ type: "basic", count: 4 }] },
         { zombies: [{ type: "basic", count: 7 }] },
-        { zombies: [{ type: "imp", count: 6 }, { type: "cone", count: 3 }] },
+        { zombies: [{ type: "imp", count: 6 }, { type: "cone", count: 3 }, { type: "poleVaulting", count: 2 }] },
         { zombies: [{ type: "bucket", count: 2 }] },
-        { zombies: [{ type: "basic", count: 8 }, { type: "cone", count: 4 }], bossWaves: true },
+        { zombies: [{ type: "basic", count: 8 }, { type: "cone", count: 4 }, { type: "poleVaulting", count: 3 }], bossWaves: true },
         { zombies: [{ type: "bucket", count: 5 }, { type: "imp", count: 8 }] },
-        { zombies: [{ type: "basic", count: 16 }, { type: "cone", count: 10 }, { type: "bucket", count: 6 }], bossWaves: true }
+        { zombies: [{ type: "basic", count: 8 }] },
+        { zombies: [{ type: "basic", count: 16 }, { type: "cone", count: 10 }, { type: "bucket", count: 6 }, { type: "poleVaulting", count: 4 }], bossWaves: true }
     ],
 };

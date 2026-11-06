@@ -10,11 +10,8 @@ ajouter les trucs web pour le référencement + icons etc...
 choper asset destruction chomp-nut et hypno-nut
 fix cherry nut pour quelle explose après chaque stade de destruction
 
-fix le 12 lane lawn pour être vraiment de plus en plus difficile
-modif level pour ne plus fight le undying wraith de jour mais que de nuit et faire l inverse pour le pôle vaulter
 modifs le menu principal
 avec les modifications du menu principal mettre une image dans le fond pour le choix des catégories aussi et mettre le bon fond selon si on est dans la catégorie jour, nuit, etc
-modifs couleurs difficulté pour avoir vert, jaune, orange, rouge
 fusion à regarder sur le wiki de pvz fusion : comet-shroom, cherry pop
 Check aussi pour ajouter doom shroom à obtenir
 

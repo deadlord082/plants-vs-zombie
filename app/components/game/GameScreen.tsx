@@ -45,6 +45,7 @@ import type {
 } from "./types";
 import { LEVELS } from "./levels";
 import { getTileDefinition, TILE_DEFINITIONS } from "./tiles";
+import { detectBrowserLanguage, isLanguage, translate, type Language } from "./i18n";
 
 const createId = () => Math.random().toString(36).slice(2, 9);
 const random = () => Math.random();
@@ -107,20 +108,22 @@ const getPuffFusionType = (first: PlantTypeKey, second: PlantTypeKey): PlantType
 };
 const canFusePlants = (first: PlantTypeKey, second: PlantTypeKey) =>
   getFusionType(first, second) !== null || getPuffFusionType(first, second) !== null;
-const describeChallenge = (challenge: LevelChallenge) => {
+const describeChallenge = (challenge: LevelChallenge, language: Language) => {
   switch (challenge.type) {
     case "produceSun":
-      return `Collect at least ${challenge.amount} sun before the level ends.`;
+      return translate("Collect at least {amount} sun before the level ends.", language, { amount: challenge.amount });
     case "maxSunSpent":
-      return `Spend no more than ${challenge.amount} sun on plants.`;
+      return translate("Spend no more than {amount} sun on plants.", language, { amount: challenge.amount });
     case "maxPlantsLost":
-      return `Lose no more than ${challenge.amount} plants. Shoveling a plant counts as losing it.`;
+      return translate("Lose no more than {amount} plants. Shoveling a plant counts as losing it.", language, { amount: challenge.amount });
     case "maxPlantsOnLawn":
-      return `Never have more than ${challenge.amount} plants on the lawn.`;
+      return translate("Never have more than {amount} plants on the lawn.", language, { amount: challenge.amount });
     case "usePlant":
-      return `Use at least one of these plants to beat the level: ${challenge.plants.map((plant) => PLANT_SPECS[plant].name).join(", ")}.`;
+      return translate("Use at least one of these plants to beat the level: {plants}.", language, {
+        plants: challenge.plants.map((plant) => translate(PLANT_SPECS[plant].name, language)).join(", "),
+      });
     case "killZombiesWithin":
-      return `Defeat ${challenge.count} zombies within ${challenge.seconds} seconds.`;
+      return translate("Defeat {count} zombies within {seconds} seconds.", language, { count: challenge.count, seconds: challenge.seconds });
   }
 };
 
@@ -240,6 +243,7 @@ const DEFAULT_PLAYER_DATA: PlayerData = {
   seedBankSize: INITIAL_SEED_BANK_SIZE,
   seedSlotsPurchased: 0,
   gloveUnlocked: false,
+  language: "en",
 };
 type AlmanacCategory = "plants" | "zombies" | "tiles";
 type RewardAnimation = "ground" | "unlocking" | "coins" | "transition";
@@ -312,15 +316,16 @@ interface PlayerData {
   seedBankSize: number;
   seedSlotsPurchased: number;
   gloveUnlocked: boolean;
+  language: Language;
 }
 
 type Difficulty = "easy" | "normal" | "hard" | "impossible";
 
 const DIFFICULTIES: Array<{ key: Difficulty; label: string; color: string }> = [
   { key: "easy", label: "Easy", color: "#58b947" },
-  { key: "normal", label: "Normal", color: "#ffffff" },
-  { key: "hard", label: "Hard", color: "#ed4545" },
-  { key: "impossible", label: "Impossible", color: "#171717" },
+  { key: "normal", label: "Normal", color: "#facc15" },
+  { key: "hard", label: "Hard", color: "#f97316" },
+  { key: "impossible", label: "Impossible", color: "#ef4444" },
 ];
 const DIFFICULTY_RANK: Record<Difficulty, number> = { easy: 0, normal: 1, hard: 2, impossible: 3 };
 const DIFFICULTY_SETTINGS: Record<Difficulty, {
@@ -366,6 +371,7 @@ export default function GameScreen() {
   const [toolCursorPosition, setToolCursorPosition] = useState<ToolCursorPosition | null>(null);
   const [isPaused, setIsPaused] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [showMenuSettings, setShowMenuSettings] = useState(false);
   const [musicVolume, setMusicVolume] = useState(0.5);
   const [musicSettingsLoaded, setMusicSettingsLoaded] = useState(false);
   const [currentLevel, setCurrentLevel] = useState<LevelConfig | null>(null);
@@ -413,6 +419,7 @@ export default function GameScreen() {
   const [showDebugHealth, setShowDebugHealth] = useState(false);
   const [playerData, setPlayerData] = useState<PlayerData>(DEFAULT_PLAYER_DATA);
   const [playerDataLoaded, setPlayerDataLoaded] = useState(false);
+  const t = (text: string, values?: Record<string, string | number>) => translate(text, playerData.language, values);
   const [rewardDrop, setRewardDrop] = useState<RewardDrop | null>(null);
   const [rewardAnimation, setRewardAnimation] = useState<RewardAnimation>("ground");
   const [rewardlessTransition, setRewardlessTransition] = useState(false);
@@ -535,9 +542,14 @@ export default function GameScreen() {
   }, [isPaused, phase]);
 
   useEffect(() => {
+    document.documentElement.lang = playerData.language;
+  }, [playerData.language]);
+
+  useEffect(() => {
     const timeout = window.setTimeout(() => {
       try {
         const stored = window.localStorage.getItem(PLAYER_DATA_STORAGE_KEY);
+        const browserLanguage = detectBrowserLanguage();
         if (stored) {
           const parsed = JSON.parse(stored) as Partial<PlayerData>;
           const storedMoney = typeof parsed.money === "number" ? parsed.money : 0;
@@ -573,9 +585,14 @@ export default function GameScreen() {
             seedBankSize: INITIAL_SEED_BANK_SIZE + seedSlotsPurchased,
             seedSlotsPurchased,
             gloveUnlocked: parsed.gloveUnlocked === true,
+            language: isLanguage(parsed.language) ? parsed.language : browserLanguage,
           };
           playerDataRef.current = loadedData;
           setPlayerData(loadedData);
+        } else {
+          const newPlayerData = { ...DEFAULT_PLAYER_DATA, language: browserLanguage };
+          playerDataRef.current = newPlayerData;
+          setPlayerData(newPlayerData);
         }
       } catch {
         window.localStorage.removeItem(PLAYER_DATA_STORAGE_KEY);
@@ -639,7 +656,7 @@ export default function GameScreen() {
   const failChallenge = (message: string) => {
     if (gameOverRef.current) return;
     gameOverRef.current = true;
-    setGameOverMessage(`Challenge failed: ${message}`);
+    setGameOverMessage(translate("Challenge failed: {message}", playerDataRef.current.language, { message }));
     setGameOver(true);
   };
 
@@ -1036,7 +1053,7 @@ export default function GameScreen() {
         const lossLimit = currentLevelRef.current?.challenges
           ?.find((challenge): challenge is Extract<LevelChallenge, { type: "maxPlantsLost" }> => challenge.type === "maxPlantsLost");
         if (lossLimit && challengeRunRef.current.plantsLost > lossLimit.amount) {
-          failChallenge(describeChallenge(lossLimit));
+          failChallenge(describeChallenge(lossLimit, playerDataRef.current.language));
         }
         refreshChallengeProgress(gameTime);
         setShovelSelected(false);
@@ -1089,13 +1106,13 @@ export default function GameScreen() {
     const sunSpendLimit = currentLevelRef.current?.challenges
       ?.find((challenge): challenge is Extract<LevelChallenge, { type: "maxSunSpent" }> => challenge.type === "maxSunSpent");
     if (sunSpendLimit && challengeRunRef.current.sunSpent > sunSpendLimit.amount) {
-      failChallenge(describeChallenge(sunSpendLimit));
+      failChallenge(describeChallenge(sunSpendLimit, playerDataRef.current.language));
     }
     refreshChallengeProgress(now);
     const plantCountLimit = currentLevelRef.current?.challenges
       ?.find((challenge): challenge is Extract<LevelChallenge, { type: "maxPlantsOnLawn" }> => challenge.type === "maxPlantsOnLawn");
     if (plantCountLimit && nextPlants.length > plantCountLimit.amount) {
-      failChallenge(describeChallenge(plantCountLimit));
+      failChallenge(describeChallenge(plantCountLimit, playerDataRef.current.language));
     }
   };
 
@@ -1373,7 +1390,7 @@ export default function GameScreen() {
       const lossLimit = currentLevel.challenges
         ?.find((challenge): challenge is Extract<LevelChallenge, { type: "maxPlantsLost" }> => challenge.type === "maxPlantsLost");
       if (lossLimit && challengeRunRef.current.plantsLost > lossLimit.amount) {
-        failChallenge(describeChallenge(lossLimit));
+        failChallenge(describeChallenge(lossLimit, playerDataRef.current.language));
       }
     };
     const nextSuns = sunsRef.current
@@ -2334,7 +2351,7 @@ export default function GameScreen() {
         || (challenge.type === "usePlant" && !challenge.plants.some((plant) => challengeRunRef.current.usedPlants.has(plant)))
         || (challenge.type === "killZombiesWithin" && !challengeRunRef.current.completedTimedKillChallenges.has(index)));
       if (failedChallenge) {
-        failChallenge(describeChallenge(failedChallenge));
+        failChallenge(describeChallenge(failedChallenge, playerDataRef.current.language));
         return;
       }
       finishLevel(lastDefeatedZombie);
@@ -2389,27 +2406,29 @@ export default function GameScreen() {
   const nextWaveProgressIndex = waveProgressSegments.findIndex((segment) => segment.progress < 100);
   const title =
     phase === "menu"
-      ? "Plants vs. Zombies"
+      ? t("Plants vs. Zombies")
       : phase === "category-select"
-        ? "Select a Category"
+        ? t("Select a Category")
         : phase === "level-select"
-          ? "Select a Level"
+          ? t("Select a Level")
           : phase === "shop"
-            ? "Shop"
+            ? t("Shop")
             : phase === "almanac"
-              ? "Almanac"
+              ? t("Almanac")
               : phase === "credits"
-                ? "Credits"
+                ? t("Credits")
+                : phase === "language-settings"
+                  ? t("Language")
                 : currentLevel
-                  ? currentLevel.title
+                  ? t(currentLevel.title)
                   : "Level";
   const waveStageLabel = (() => {
     if (!currentLevel) return "";
     const nextWave = nextWaveProgressIndex >= 0 ? compiledCurrentLevel?.spawnWaves[nextWaveProgressIndex] : null;
-    if (!nextWave) return "All waves have spawned. Clear the remaining zombies.";
-    if (waveActive && nextWave.isBoss) return "Boss wave in progress.";
-    if (nextWave.isBoss) return "Boss wave approaching. Clear the lawn.";
-    return waveActive ? "Regular zombies are marching." : "Preparing the next wave.";
+    if (!nextWave) return t("All waves have spawned. Clear the remaining zombies.");
+    if (waveActive && nextWave.isBoss) return t("Boss wave in progress.");
+    if (nextWave.isBoss) return t("Boss wave approaching. Clear the lawn.");
+    return waveActive ? t("Regular zombies are marching.") : t("Preparing the next wave.");
   })();
   const zombieTypes = compiledCurrentLevel
     ? Array.from(
@@ -2436,19 +2455,45 @@ export default function GameScreen() {
         {phase === "menu" && (
           <div className="main-menu">
             <div className="menu-sunburst" aria-hidden="true"><img src="/other/sun.webp" alt="" /></div>
-            <p className="menu-kicker">Welcome to the lawn</p>
-            <h2>Choose your defense</h2>
-            <p className="menu-copy">Plant wisely, collect sun, and stop the zombie waves before they reach the house.</p>
+            <p className="menu-kicker">{t("Welcome to the lawn")}</p>
+            <h2>{t("Choose your defense")}</h2>
+            <p className="menu-copy">{t("Plant wisely, collect sun, and stop the zombie waves before they reach the house.")}</p>
             <div className="mb-6 flex items-center justify-center gap-5 text-lg font-semibold text-amber-200">
-              <span>Money: ${playerData.money}</span>
-              <span>Seed slots: {playerData.seedBankSize}</span>
+              <span>{t("Money: ${money}", { money: playerData.money })}</span>
+              <span>{t("Seed slots: {count}", { count: playerData.seedBankSize })}</span>
             </div>
             <div className="menu-actions">
-              <button type="button" onClick={() => setPhase("category-select")} className="menu-primary">Start Game <span>→</span></button>
-              <button type="button" onClick={() => setPhase("shop")} className="menu-secondary">Shop <span>◆</span></button>
-              <button type="button" onClick={() => openAlmanac("menu")} className="menu-secondary">Open Almanac <span className="almanac-menu-icon"><img src="/other/almanac.webp" alt="" /></span></button>
-              <button type="button" onClick={() => setPhase("credits")} className="menu-secondary">Credits <span>✦</span></button>
+              <button type="button" onClick={() => setPhase("category-select")} className="menu-primary">{t("Start Game")} <span>→</span></button>
+              <button type="button" onClick={() => setPhase("shop")} className="menu-secondary">{t("Shop")} <span>◆</span></button>
+              <button type="button" onClick={() => openAlmanac("menu")} className="menu-secondary">{t("Open Almanac")} <span className="almanac-menu-icon"><img src="/other/almanac.webp" alt="" /></span></button>
+              <button type="button" onClick={() => setPhase("language-settings")} className="menu-secondary">{t("Language")} <span>文</span></button>
+              <button type="button" onClick={() => setShowMenuSettings(true)} className="menu-secondary">{t("Settings")} <span>⚙</span></button>
+              <button type="button" onClick={() => setPhase("credits")} className="menu-secondary">{t("Credits")} <span>✦</span></button>
             </div>
+          </div>
+        )}
+
+        {phase === "language-settings" && (
+          <div className="level-select-screen settings-menu-screen">
+            <div className="screen-heading"><div><p className="menu-kicker">{t("Language")}</p><h2>{t("Choose a language")}</h2></div></div>
+            <div className="menu-actions">
+              {(["en", "fr"] as const).map((language) => (
+                <button
+                  key={language}
+                  type="button"
+                  aria-pressed={playerData.language === language}
+                  className={playerData.language === language ? "menu-primary" : "menu-secondary"}
+                  onClick={() => {
+                    const nextData = { ...playerDataRef.current, language };
+                    playerDataRef.current = nextData;
+                    setPlayerData(nextData);
+                  }}
+                >
+                  {t(language === "en" ? "English" : "French")}
+                </button>
+              ))}
+            </div>
+            <button type="button" onClick={() => setPhase("menu")} className="text-button">{t("Back to main menu")}</button>
           </div>
         )}
 
@@ -2456,21 +2501,21 @@ export default function GameScreen() {
           <div className="credits-screen">
             <div className="credits-scroll" aria-label="Credits">
               <div className="credits-content">
-                <p className="credits-kicker">Plants vs. Zombies</p>
-                <h2>Credits</h2>
-                <p>This game is heavily inspired by the original Plants vs. Zombies from EA.</p>
-                <p>Everything has been made by me.</p>
+                <p className="credits-kicker">{t("Plants vs. Zombies")}</p>
+                <h2>{t("Credits")}</h2>
+                <p>{t("This game is heavily inspired by the original Plants vs. Zombies from EA.")}</p>
+                <p>{t("Everything has been made by me.")}</p>
                 <p className="credits-name">Gaboriau Lukas</p>
-                <p className="credits-thanks">Thank you for playing.</p>
+                <p className="credits-thanks">{t("Thank you for playing.")}</p>
               </div>
             </div>
-            <button type="button" onClick={() => setPhase("menu")} className="credits-back-button">Back to main menu</button>
+            <button type="button" onClick={() => setPhase("menu")} className="credits-back-button">{t("Back to main menu")}</button>
           </div>
         )}
 
         {phase === "category-select" && (
           <div className="level-select-screen category-select-screen">
-            <div className="screen-heading"><div><p className="menu-kicker">Choose your chapter</p><h2>Select a Category</h2><p>Every category brings a different kind of lawn.</p></div><button type="button" onClick={() => setPhase("menu")} className="text-button">Back to menu</button></div>
+            <div className="screen-heading"><div><p className="menu-kicker">{t("Choose your chapter")}</p><h2>{t("Select a Category")}</h2><p>{t("Every category brings a different kind of lawn.")}</p></div><button type="button" onClick={() => setPhase("menu")} className="text-button">{t("Back to menu")}</button></div>
             <div className="category-card-grid">
               {LEVEL_CATEGORIES.map((category) => {
                 const categoryLevels = LEVELS.filter((level) => level.category === category.key);
@@ -2478,9 +2523,9 @@ export default function GameScreen() {
                 const categoryTrophy = getCategoryTrophy(category.key);
                 return (
                   <button key={category.key} type="button" onClick={() => { setSelectedLevelCategory(category.key); setPhase("level-select"); }} className={`category-card ${isCompleted ? "completed" : ""}`}>
-                    {isCompleted && <span className="level-completed-ribbon">Completed</span>}
+                    {isCompleted && <span className="level-completed-ribbon">{t("Completed")}</span>}
                     <span className="category-card-number">{categoryLevels.length || "-"}</span>
-                    <span className="category-card-content"><strong>{category.name}</strong><small>{category.description}</small><em>{categoryLevels.length ? `${categoryLevels.length} level${categoryLevels.length === 1 ? "" : "s"}` : "Coming soon"}</em></span>
+                    <span className="category-card-content"><strong>{t(category.name)}</strong><small>{t(category.description)}</small><em>{categoryLevels.length ? `${categoryLevels.length} ${t(categoryLevels.length === 1 ? "level" : "levels")}` : t("Coming soon")}</em></span>
                     <span className="category-card-trailing">
                       {categoryTrophy && <img className="difficulty-trophy category-difficulty-trophy" src={TROPHY_IMAGES[categoryTrophy]} alt={`${categoryTrophy} category trophy`} />}
                       <span className="category-card-arrow">→</span>
@@ -2494,11 +2539,11 @@ export default function GameScreen() {
 
         {phase === "level-select" && (
           <div className="level-select-screen">
-            <div className="screen-heading"><div><p className="menu-kicker">{LEVEL_CATEGORIES.find((category) => category.key === selectedLevelCategory)?.name} category</p><h2>Select a Level</h2><p>Each lawn brings a different layout and wave pattern.</p></div><button type="button" onClick={() => setPhase("category-select")} className="text-button">Back</button></div>
+            <div className="screen-heading"><div><p className="menu-kicker">{t(LEVEL_CATEGORIES.find((category) => category.key === selectedLevelCategory)?.name || "Day")} {t("category")}</p><h2>{t("Select a Level")}</h2><p>{t("Each lawn brings a different layout and wave pattern.")}</p></div><button type="button" onClick={() => setPhase("category-select")} className="text-button">{t("Back")}</button></div>
             <section className={`difficulty-selector difficulty-${playerData.difficulty}`} aria-labelledby="difficulty-title" style={{ "--difficulty-color": selectedDifficulty.color } as CSSProperties}>
               <div className="difficulty-selector-heading">
-                <div><h3 id="difficulty-title">Difficulty</h3><p>Changes apply to your next level.</p></div>
-                <output className={`difficulty-current difficulty-current-${playerData.difficulty}`} htmlFor="difficulty-slider">{selectedDifficulty.label}</output>
+                <div><h3 id="difficulty-title">{t("Difficulty")}</h3><p>{t("Changes apply to your next level.")}</p></div>
+                <output className={`difficulty-current difficulty-current-${playerData.difficulty}`} htmlFor="difficulty-slider">{t(selectedDifficulty.label)}</output>
               </div>
               <input
                 id="difficulty-slider"
@@ -2507,25 +2552,25 @@ export default function GameScreen() {
                 max={DIFFICULTIES.length - 1}
                 step="1"
                 value={selectedDifficultyIndex}
-                aria-label="Difficulty"
-                aria-valuetext={selectedDifficulty.label}
+                aria-label={t("Difficulty")}
+                aria-valuetext={t(selectedDifficulty.label)}
                 onChange={(event) => selectDifficulty(DIFFICULTIES[Number(event.currentTarget.value)].key)}
               />
               <div className="difficulty-ticks" aria-hidden="true">
-                {DIFFICULTIES.map((difficulty) => <span key={difficulty.key} className={`difficulty-tick difficulty-tick-${difficulty.key} ${difficulty.key === playerData.difficulty ? "selected" : ""}`}>{difficulty.label}</span>)}
+                {DIFFICULTIES.map((difficulty) => <span key={difficulty.key} className={`difficulty-tick difficulty-tick-${difficulty.key} ${difficulty.key === playerData.difficulty ? "selected" : ""}`}>{t(difficulty.label)}</span>)}
               </div>
             </section>
             <div className="level-card-grid">
               {LEVELS.filter((level) => level.category === selectedLevelCategory).map((level) => (
                 <div key={level.id} className={`level-card ${level.unlockAfterLevelId !== undefined && !playerData.completedLevels.includes(level.unlockAfterLevelId) ? "locked" : ""}`}>
-                  {playerData.completedLevels.includes(level.id) && <span className="level-completed-ribbon">Completed</span>}
+                  {playerData.completedLevels.includes(level.id) && <span className="level-completed-ribbon">{t("Completed")}</span>}
                   <div className="level-card-content">
                     <div>
-                      <h2 className="text-2xl font-semibold text-white">{level.title}</h2>
-                      <p>{level.unlockAfterLevelId !== undefined && !playerData.completedLevels.includes(level.unlockAfterLevelId) ? "Complete the previous level to unlock this lawn." : level.description}</p>
+                      <h2 className="text-2xl font-semibold text-white">{t(level.title)}</h2>
+                      <p>{t(level.unlockAfterLevelId !== undefined && !playerData.completedLevels.includes(level.unlockAfterLevelId) ? "Complete the previous level to unlock this lawn." : level.description)}</p>
                     </div>
                     <div className="level-card-actions">
-                      <button type="button" onClick={() => startLevel(level.id)} disabled={level.unlockAfterLevelId !== undefined && !playerData.completedLevels.includes(level.unlockAfterLevelId)} className="menu-primary disabled:cursor-not-allowed disabled:opacity-50">{level.unlockAfterLevelId !== undefined && !playerData.completedLevels.includes(level.unlockAfterLevelId) ? "Locked" : "Play Level"} <span>{level.unlockAfterLevelId !== undefined && !playerData.completedLevels.includes(level.unlockAfterLevelId) ? "●" : "→"}</span></button>
+                      <button type="button" onClick={() => startLevel(level.id)} disabled={level.unlockAfterLevelId !== undefined && !playerData.completedLevels.includes(level.unlockAfterLevelId)} className="menu-primary disabled:cursor-not-allowed disabled:opacity-50">{t(level.unlockAfterLevelId !== undefined && !playerData.completedLevels.includes(level.unlockAfterLevelId) ? "Locked" : "Play Level")} <span>{level.unlockAfterLevelId !== undefined && !playerData.completedLevels.includes(level.unlockAfterLevelId) ? "●" : "→"}</span></button>
                       {getTrophyImage(playerData.levelTrophies[level.id]) && <img className="difficulty-trophy level-difficulty-trophy" src={getTrophyImage(playerData.levelTrophies[level.id])!} alt={`${playerData.levelTrophies[level.id]} difficulty trophy`} />}
                     </div>
                   </div>
@@ -2537,17 +2582,17 @@ export default function GameScreen() {
 
         {phase === "shop" && (
           <div className="level-select-screen">
-            <div className="screen-heading"><div><p className="menu-kicker">Improve your defense</p><h2>Shop</h2><p>Start with five base plant slots, then spend rewards to expand your seed bank.</p></div><button type="button" onClick={() => setPhase("menu")} className="text-button">Back to menu</button></div>
+            <div className="screen-heading"><div><p className="menu-kicker">{t("Improve your defense")}</p><h2>{t("Shop")}</h2><p>{t("Start with five base plant slots, then spend rewards to expand your seed bank.")}</p></div><button type="button" onClick={() => setPhase("menu")} className="text-button">{t("Back to menu")}</button></div>
             <div className="level-card max-w-xl">
               <div className="level-card-number">+</div>
               <div className="level-card-content">
                 <div>
-                  <h2 className="text-2xl font-semibold text-white">Expand your seed bank</h2>
-                  <p>Start with five base plant slots. Two one-time upgrades are available.</p>
-                  <p className="mt-2 font-semibold text-amber-200">Price: ${SEED_SLOT_COSTS[playerData.seedSlotsPurchased] || "-"} | Balance: ${playerData.money} | Capacity: {playerData.seedBankSize}</p>
+                  <h2 className="text-2xl font-semibold text-white">{t("Expand your seed bank")}</h2>
+                  <p>{t("Start with five base plant slots. Two one-time upgrades are available.")}</p>
+                  <p className="mt-2 font-semibold text-amber-200">{t("Price: ${price} | Balance: ${balance} | Capacity: {capacity}", { price: SEED_SLOT_COSTS[playerData.seedSlotsPurchased] || "-", balance: playerData.money, capacity: playerData.seedBankSize })}</p>
                 </div>
                 <button type="button" onClick={buySeedSlot} disabled={playerData.seedSlotsPurchased >= SEED_SLOT_COSTS.length || playerData.money < (SEED_SLOT_COSTS[playerData.seedSlotsPurchased] || Infinity)} className="menu-primary disabled:cursor-not-allowed disabled:opacity-50">
-                  {playerData.seedSlotsPurchased >= SEED_SLOT_COSTS.length ? "All slots purchased" : "Buy slot"}
+                  {t(playerData.seedSlotsPurchased >= SEED_SLOT_COSTS.length ? "All slots purchased" : "Buy slot")}
                 </button>
               </div>
             </div>
@@ -2556,22 +2601,30 @@ export default function GameScreen() {
 
         {phase === "almanac" && (
           <div className="almanac-screen">
-            <div className="screen-heading"><div><p className="menu-kicker">Know your tools</p><h2>Almanac</h2><p>Everything discovered on the lawn, in one place.</p></div><button type="button" onClick={() => { setPhase(almanacReturnPhase); if (almanacReturnPhase === "menu") setIsPaused(false); }} className="text-button">{almanacReturnPhase === "playing" ? "Back to pause menu" : "Back to main menu"}</button></div>
-            <div className="almanac-tabs" role="tablist" aria-label="Almanac categories">
-              {(["plants", "zombies", "tiles"] as AlmanacCategory[]).map((category) => <button key={category} type="button" role="tab" aria-selected={almanacCategory === category} onClick={() => setAlmanacCategory(category)} className={almanacCategory === category ? "active" : ""}>{category}</button>)}
+            <div className="screen-heading"><div><p className="menu-kicker">{t("Know your tools")}</p><h2>{t("Almanac")}</h2><p>{t("Everything discovered on the lawn, in one place.")}</p></div><button type="button" onClick={() => { setPhase(almanacReturnPhase); if (almanacReturnPhase === "menu") setIsPaused(false); }} className="text-button">{t(almanacReturnPhase === "playing" ? "Back to pause menu" : "Back to main menu")}</button></div>
+            <div className="almanac-tabs" role="tablist" aria-label={t("Almanac categories")}>
+              {(["plants", "zombies", "tiles"] as AlmanacCategory[]).map((category) => <button key={category} type="button" role="tab" aria-selected={almanacCategory === category} onClick={() => setAlmanacCategory(category)} className={almanacCategory === category ? "active" : ""}>{t(category)}</button>)}
             </div>
             <div className="almanac-grid">
-              {almanacCategory === "plants" && !almanacPlantKey && BASE_PLANT_TYPES.map((plantKey) => {
+              {almanacCategory === "plants" && !almanacPlantKey && BASE_PLANT_TYPES
+                .filter((plantKey) => playerData.unlockedPlants.includes(plantKey))
+                .map((plantKey) => {
                 const spec = PLANT_SPECS[plantKey];
-                return <article key={spec.key} className="almanac-card"><div className="almanac-art plant-art"><img src={getPlantImage(spec.key)} alt="" /></div><div><p className="almanac-type">Plant</p><h3>{spec.name}</h3><p>{spec.summary}</p><dl><div><dt>Cost</dt><dd>{spec.cost} sun</dd></div><div><dt>Health</dt><dd>{spec.hp} HP</dd></div><div><dt>Recharge</dt><dd>{spec.rechargeMs / 1000}s</dd></div>{spec.damage && <div><dt>Damage</dt><dd>{spec.damage}</dd></div>}</dl><button type="button" className="almanac-fusion-button" onClick={() => setAlmanacPlantKey(plantKey)}>View fusions</button></div></article>;
+                const hasUnlockedFusions = Object.values(PLANT_SPECS).some((fusion) =>
+                  fusion.fusionOf?.includes(plantKey)
+                  && fusion.fusionOf.every((ingredient) => playerData.unlockedPlants.includes(ingredient)));
+                return <article key={spec.key} className="almanac-card"><div className="almanac-art plant-art"><img src={getPlantImage(spec.key)} alt="" /></div><div><p className="almanac-type">{t("Plant")}</p><h3>{t(spec.name)}</h3><p>{t(spec.summary)}</p><dl><div><dt>{t("Cost")}</dt><dd>{spec.cost} {t("sun")}</dd></div><div><dt>{t("Health")}</dt><dd>{spec.hp} {t("HP")}</dd></div><div><dt>{t("Recharge")}</dt><dd>{spec.rechargeMs / 1000}s</dd></div>{spec.damage && <div><dt>{t("Damage")}</dt><dd>{spec.damage}</dd></div>}</dl>{hasUnlockedFusions && <button type="button" className="almanac-fusion-button" onClick={() => setAlmanacPlantKey(plantKey)}>{t("View fusions")}</button>}</div></article>;
               })}
               {almanacCategory === "plants" && almanacPlantKey && <>
-                <div className="almanac-fusion-heading"><button type="button" className="text-button" onClick={() => setAlmanacPlantKey(null)}>Back to plants</button><div><p className="almanac-type">Fusions</p><h3>{PLANT_SPECS[almanacPlantKey].name} combinations</h3></div></div>
-                {Object.values(PLANT_SPECS).filter((spec) => spec.fusionOf?.includes(almanacPlantKey as never)).map((spec) => <article key={spec.key} className="almanac-card"><div className="almanac-art plant-art"><img src={getPlantImage(spec.key)} alt="" /></div><div><p className="almanac-type">Fusion plant</p><h3>{spec.name}</h3><p>{spec.summary}</p><p className="almanac-recipe">Requires {spec.fusionOf?.map((key) => PLANT_SPECS[key].name).join(" + ")}</p><dl><div><dt>Health</dt><dd>{spec.hp} HP</dd></div>{spec.damage !== undefined && <div><dt>Damage</dt><dd>{spec.damage}</dd></div>}{spec.shootMs && <div><dt>Attack interval</dt><dd>{Math.round(spec.shootMs * (spec.fireRateMultiplier || 1) / 100) / 10}s</dd></div>}{spec.generateAmount && <div><dt>Sun per burst</dt><dd>{spec.generateAmount}</dd></div>}{spec.generateMs && <div><dt>Sun interval</dt><dd>{spec.generateMs / 1000}s</dd></div>}{spec.hypnotizeChance && <div><dt>Hypnotize chance</dt><dd>{spec.hypnotizeChance * 100}%</dd></div>}{spec.freezeDurationMs && <div><dt>Freeze duration</dt><dd>{spec.freezeDurationMs / 1000}s</dd></div>}</dl></div></article>)}
+                <div className="almanac-fusion-heading"><button type="button" className="text-button" onClick={() => setAlmanacPlantKey(null)}>{t("Back to plants")}</button><div><p className="almanac-type">{t("Fusions")}</p><h3>{t(PLANT_SPECS[almanacPlantKey].name)} {t("combinations")}</h3></div></div>
+                {Object.values(PLANT_SPECS).filter((spec) =>
+                  spec.fusionOf?.includes(almanacPlantKey)
+                  && spec.fusionOf.every((ingredient) => playerData.unlockedPlants.includes(ingredient)))
+                  .map((spec) => <article key={spec.key} className="almanac-card"><div className="almanac-art plant-art"><img src={getPlantImage(spec.key)} alt="" /></div><div><p className="almanac-type">{t("Fusion plant")}</p><h3>{t(spec.name)}</h3><p>{t(spec.summary)}</p><p className="almanac-recipe">{t("Requires {partners}", { partners: spec.fusionOf?.map((key) => t(PLANT_SPECS[key].name)).join(" + ") || "" })}</p><dl><div><dt>{t("Health")}</dt><dd>{spec.hp} {t("HP")}</dd></div>{spec.damage !== undefined && <div><dt>{t("Damage")}</dt><dd>{spec.damage}</dd></div>}{spec.shootMs && <div><dt>{t("Attack interval")}</dt><dd>{Math.round(spec.shootMs * (spec.fireRateMultiplier || 1) / 100) / 10}s</dd></div>}{spec.generateAmount && <div><dt>{t("Sun per burst")}</dt><dd>{spec.generateAmount}</dd></div>}{spec.generateMs && <div><dt>{t("Sun interval")}</dt><dd>{spec.generateMs / 1000}s</dd></div>}{spec.hypnotizeChance && <div><dt>{t("Hypnotize chance")}</dt><dd>{spec.hypnotizeChance * 100}%</dd></div>}{spec.freezeDurationMs && <div><dt>{t("Freeze duration")}</dt><dd>{spec.freezeDurationMs / 1000}s</dd></div>}</dl></div></article>)}
               </>}
-              {almanacCategory === "zombies" && Object.values(ZOMBIE_SPECS).filter((spec) => (playerData.zombieKills[spec.key] || 0) > 0).map((spec) => <article key={spec.key} className="almanac-card"><div className="almanac-art zombie-art relative"><img src={getZombieImage(spec.key)} alt="" />{(spec.key === "cone" || spec.key === "bucket") && <img src={spec.key === "cone" ? "/zombie/cone.webp" : "/zombie/bucket.webp"} alt="" className="absolute object-contain" style={{ width: "33.333%", height: "33.333%", left: "40%", top: "18%", transform: "translateX(-50%)" }} />}</div><div><p className="almanac-type">Zombie</p><h3>{spec.name}</h3><p>{spec.summary}</p><dl><div><dt>Defeated</dt><dd>{playerData.zombieKills[spec.key]}</dd></div><div><dt>Health</dt><dd>{spec.hp} HP</dd></div><div><dt>Speed</dt><dd>{Math.round(spec.moveMs / 100) / 10}s / tile</dd></div><div><dt>Damage</dt><dd>{spec.damage}</dd></div><div><dt>Attack</dt><dd>{spec.attackMs / 1000}s</dd></div><div><dt>Armor</dt><dd>{spec.armor}</dd></div></dl></div></article>)}
-              {almanacCategory === "zombies" && !Object.values(ZOMBIE_SPECS).some((spec) => (playerData.zombieKills[spec.key] || 0) > 0) && <p className="almanac-empty">No zombies defeated yet.</p>}
-              {almanacCategory === "tiles" && Object.values(TILE_DEFINITIONS).map((tile) => <article key={tile.key} className="almanac-card tile-card"><div className={`almanac-tile-swatch ${tile.key}`} /><div><p className="almanac-type">Tile</p><h3>{{ normal: "Lawn", normalDark: "Dark lawn", obstructed: "Obstructed", sunflowerStatue: "Sunflower statue", sunShroomStatue: "Sun-shroom statue", grave: "Gravestone" }[tile.key]}</h3><p>{tile.description}</p><dl><div><dt>Plantable</dt><dd>{tile.canPlant ? "Yes" : "No"}</dd></div><div><dt>Label</dt><dd>{tile.label || "None"}</dd></div></dl></div></article>)}
+              {almanacCategory === "zombies" && Object.values(ZOMBIE_SPECS).filter((spec) => (playerData.zombieKills[spec.key] || 0) > 0).map((spec) => <article key={spec.key} className="almanac-card"><div className="almanac-art zombie-art relative"><img src={getZombieImage(spec.key)} alt="" />{(spec.key === "cone" || spec.key === "bucket") && <img src={spec.key === "cone" ? "/zombie/cone.webp" : "/zombie/bucket.webp"} alt="" className="absolute object-contain" style={{ width: "33.333%", height: "33.333%", left: "40%", top: "18%", transform: "translateX(-50%)" }} />}</div><div><p className="almanac-type">{t("Zombie")}</p><h3>{t(spec.name)}</h3><p>{t(spec.summary)}</p><dl><div><dt>{t("Defeated")}</dt><dd>{playerData.zombieKills[spec.key]}</dd></div><div><dt>{t("Health")}</dt><dd>{spec.hp} {t("HP")}</dd></div><div><dt>{t("Speed")}</dt><dd>{Math.round(spec.moveMs / 100) / 10}s / {t("tile")}</dd></div><div><dt>{t("Damage")}</dt><dd>{spec.damage}</dd></div><div><dt>{t("Attack")}</dt><dd>{spec.attackMs / 1000}s</dd></div><div><dt>{t("Armor")}</dt><dd>{spec.armor}</dd></div></dl></div></article>)}
+              {almanacCategory === "zombies" && !Object.values(ZOMBIE_SPECS).some((spec) => (playerData.zombieKills[spec.key] || 0) > 0) && <p className="almanac-empty">{t("No zombies defeated yet.")}</p>}
+              {almanacCategory === "tiles" && Object.values(TILE_DEFINITIONS).map((tile) => <article key={tile.key} className="almanac-card tile-card"><div className={`almanac-tile-swatch ${tile.key}`} /><div><p className="almanac-type">{t("Tile")}</p><h3>{t(({ normal: "Lawn", normalDark: "Dark lawn", obstructed: "Obstructed", sunflowerStatue: "Sunflower statue", sunShroomStatue: "Sun-shroom statue", grave: "Gravestone" } as Record<string, string>)[tile.key] || tile.key)}</h3><p>{t(tile.description)}</p><dl><div><dt>{t("Plantable")}</dt><dd>{t(tile.canPlant ? "Yes" : "No")}</dd></div><div><dt>{t("Label")}</dt><dd>{t(tile.label || "None")}</dd></div></dl></div></article>)}
             </div>
           </div>
         )}
@@ -2581,11 +2634,11 @@ export default function GameScreen() {
             <section className="loadout-plants">
               <div className="loadout-heading">
                 <div>
-                  <p className="loadout-kicker">Prepare your defense</p>
-                  <h2>{currentLevel.title}</h2>
-                  <p>{currentLevel.description}</p>
+                  <p className="loadout-kicker">{t("Prepare your defense")}</p>
+                  <h2>{t(currentLevel.title)}</h2>
+                  <p>{t(currentLevel.description)}</p>
                 </div>
-                <div className="loadout-heading-actions"><button type="button" onClick={() => setPhase("level-select")} className="text-button">Back</button><div className="loadout-count">{selectedLoadout.length} / {playerData.seedBankSize}</div></div>
+                <div className="loadout-heading-actions"><button type="button" onClick={() => setPhase("level-select")} className="text-button">{t("Back")}</button><div className="loadout-count">{selectedLoadout.length} / {playerData.seedBankSize}</div></div>
               </div>
               <div className="plant-choice-grid">
                 {playerData.unlockedPlants.map((plantKey) => {
@@ -2595,7 +2648,7 @@ export default function GameScreen() {
                   return (
                     <button key={plantKey} type="button" onClick={() => toggleLoadoutPlant(plantKey)} disabled={disabledByChallenge} className={`plant-choice ${selected ? "selected" : ""} ${disabledByChallenge ? "unavailable" : ""}`} aria-pressed={selected}>
                       <div className="plant-choice-image"><img src={getPlantImage(plantKey)} alt="" /></div>
-                      <div><h3>{spec.name}</h3><p>{spec.cost} sun</p></div>
+                      <div><h3>{t(spec.name)}</h3><p>{spec.cost} {t("sun")}</p></div>
                       <span className="plant-choice-check">{selected ? "✓" : "+"}</span>
                     </button>
                   );
@@ -2609,22 +2662,22 @@ export default function GameScreen() {
               </div>
             </section>
             <aside className="loadout-zombies">
-              <div className="loadout-heading"><div><p className="loadout-kicker">Incoming threats</p><h2>Zombies</h2></div><span className="zombie-count">{zombieTypes.length}</span></div>
+              <div className="loadout-heading"><div><p className="loadout-kicker">{t("Incoming threats")}</p><h2>{t("Zombies")}</h2></div><span className="zombie-count">{zombieTypes.length}</span></div>
               <div className="zombie-choice-list">
                 {zombieTypes.map((zombieType) => {
-                  return <div key={zombieType} className="zombie-choice"><div className="zombie-choice-art"><img src={getZombieImage(zombieType)} alt="" />{(zombieType === "cone" || zombieType === "bucket") && <img src={zombieType === "cone" ? "/zombie/cone.webp" : "/zombie/bucket.webp"} alt="" className="zombie-choice-hat" />}</div><div><strong>{getZombieLabel(zombieType)}</strong></div></div>;
+                  return <div key={zombieType} className="zombie-choice"><div className="zombie-choice-art"><img src={getZombieImage(zombieType)} alt="" />{(zombieType === "cone" || zombieType === "bucket") && <img src={zombieType === "cone" ? "/zombie/cone.webp" : "/zombie/bucket.webp"} alt="" className="zombie-choice-hat" />}</div><div><strong>{t(getZombieLabel(zombieType))}</strong></div></div>;
                 })}
               </div>
             </aside>
-            <button type="button" className="start-level-button" disabled={selectedLoadout.length === 0 || requiredLoadoutPlantSets.some((plantSet) => !plantSet.some((plant) => selectedLoadout.includes(plant)))} onClick={beginLevel}>Start level <span>→</span></button>
+            <button type="button" className="start-level-button" disabled={selectedLoadout.length === 0 || requiredLoadoutPlantSets.some((plantSet) => !plantSet.some((plant) => selectedLoadout.includes(plant)))} onClick={beginLevel}>{t("Start level")} <span>→</span></button>
           </div>
         )}
 
         {(phase === "playing" || phase === "complete") && (
           <div className="mt-6 space-y-4">
             <div className="game-toolbar">
-              <div ref={sunCounterRef} className="sun-counter" aria-label={`${sun} sun available`}><img className="sun-token" src="/other/sun.webp" alt="" /> <strong>{sun}</strong></div>
-              <div className="seed-tray" aria-label="Seed packet selection" style={{ gridTemplateColumns: `repeat(${playerData.seedBankSize}, minmax(3rem, 4.4rem))` }}>
+              <div ref={sunCounterRef} className="sun-counter" aria-label={`${sun} ${t("sun")} ${t("available")}`}><img className="sun-token" src="/other/sun.webp" alt="" /> <strong>{sun}</strong></div>
+              <div className="seed-tray" aria-label={t("Seed packet selection")} style={{ gridTemplateColumns: `repeat(${playerData.seedBankSize}, minmax(3rem, 4.4rem))` }}>
                 {selectedLoadout.map((plantKey) => {
                   const spec = PLANT_SPECS[plantKey];
                   const ready = plantReady[plantKey] <= gameTime;
@@ -2632,7 +2685,7 @@ export default function GameScreen() {
                   const disabled = !ready || !enoughSun;
                   const coolDown = Math.max(0, Math.ceil((plantReady[plantKey] - gameTime) / 1000));
                   return (
-                    <button key={plantKey} type="button" aria-label={`${spec.name}, costs ${spec.cost} sun`} onClick={() => { setSelectedPlant(plantKey); setShovelSelected(false); setGloveSelected(false); setMovingPlantId(null); }} className={`seed-slot ${selectedPlant === plantKey && !shovelSelected && !gloveSelected ? "selected" : ""} ${disabled ? "unavailable" : ""}`}>
+                    <button key={plantKey} type="button" aria-label={`${t(spec.name)}, ${t("costs")} ${spec.cost} ${t("sun")}`} onClick={() => { setSelectedPlant(plantKey); setShovelSelected(false); setGloveSelected(false); setMovingPlantId(null); }} className={`seed-slot ${selectedPlant === plantKey && !shovelSelected && !gloveSelected ? "selected" : ""} ${disabled ? "unavailable" : ""}`}>
                       <img src={getPlantImage(spec.key)} alt="" />
                       <span>{spec.cost}</span>
                       {!ready && <small>{coolDown}s</small>}
@@ -2641,12 +2694,12 @@ export default function GameScreen() {
                 })}
                 {Array.from({ length: Math.max(0, playerData.seedBankSize - selectedLoadout.length) }).map((_, index) => <div key={`empty-${index}`} className="seed-slot empty" aria-hidden="true" />)}
               </div>
-              <button type="button" aria-label="Select shovel" aria-keyshortcuts="1" onClick={selectShovel} className={`shovel-button ${shovelSelected ? "selected" : ""}`}><img src="/other/shovel.webp" alt="" /><kbd className="shortcut-hint">1</kbd></button>
-              {playerData.gloveUnlocked && <button type="button" aria-label="Select glove" aria-keyshortcuts="2" onClick={selectGlove} disabled={gloveReadyAt > gameTime} className={`shovel-button glove-button ${gloveSelected ? "selected" : ""} ${gloveReadyAt > gameTime ? "unavailable" : ""}`}><img src="/other/glove.webp" alt="" /><kbd className="shortcut-hint">2</kbd>{gloveReadyAt > gameTime && <small>{Math.ceil((gloveReadyAt - gameTime) / 1000)}s</small>}</button>}
-              <button type="button" aria-label="Open pause menu" aria-keyshortcuts="Escape" onClick={() => setIsPaused(true)} className="settings-button">⚙<kbd className="shortcut-hint">Esc</kbd></button>
+              <button type="button" aria-label={t("Select shovel")} aria-keyshortcuts="1" onClick={selectShovel} className={`shovel-button ${shovelSelected ? "selected" : ""}`}><img src="/other/shovel.webp" alt="" /><kbd className="shortcut-hint">1</kbd></button>
+              {playerData.gloveUnlocked && <button type="button" aria-label={t("Select glove")} aria-keyshortcuts="2" onClick={selectGlove} disabled={gloveReadyAt > gameTime} className={`shovel-button glove-button ${gloveSelected ? "selected" : ""} ${gloveReadyAt > gameTime ? "unavailable" : ""}`}><img src="/other/glove.webp" alt="" /><kbd className="shortcut-hint">2</kbd>{gloveReadyAt > gameTime && <small>{Math.ceil((gloveReadyAt - gameTime) / 1000)}s</small>}</button>}
+              <button type="button" aria-label={t("Open pause menu")} aria-keyshortcuts="Escape" onClick={() => setIsPaused(true)} className="settings-button">⚙<kbd className="shortcut-hint">Esc</kbd></button>
             </div>
             {currentLevel?.challenges && currentLevel.challenges.some((challenge) => challenge.type !== "usePlant") && (
-              <div className="challenge-tags" aria-label="Level challenges">
+              <div className="challenge-tags" aria-label={t("Level challenges")}>
                 {currentLevel.challenges.map((challenge, index) => {
                   if (challenge.type === "usePlant") return null;
                   let label: ReactNode;
@@ -2660,10 +2713,10 @@ export default function GameScreen() {
                   } else if (challenge.type === "maxPlantsLost") {
                     valid = challengeProgress.plantsLost <= challenge.amount;
                     const plantsLeft = Math.max(0, challenge.amount - challengeProgress.plantsLost);
-                    label = <>{plantsLeft} plant left</>;
+                    label = <>{plantsLeft} {t("plants left")}</>;
                   } else if (challenge.type === "maxPlantsOnLawn") {
                     valid = plants.length <= challenge.amount;
-                    label = <>{plants.length} / {challenge.amount} plants</>;
+                    label = <>{plants.length} / {challenge.amount} {t("plants")}</>;
                   } else {
                     const recentKills = challengeProgress.zombieKillCounts[index] || 0;
                     valid = challengeProgress.completedTimedKillChallenges.includes(index)
@@ -2718,18 +2771,18 @@ export default function GameScreen() {
                       data-lawn-row={row}
                       data-lawn-col={col}
                       disabled={Boolean(statue) && selectedPlant !== "graveBuster" || !tile.canPlant && selectedPlant !== "graveBuster"}
-                      aria-label={tile.label || "Available lawn tile"}
+                      aria-label={t(tile.label || "Available lawn tile")}
                       className={`relative min-h-16 overflow-visible p-2 text-left transition ${tile.className}`}
                     >
                       {statue && statue.type !== "grave" && (
                         <div className="absolute inset-0 z-10 pointer-events-none">
-                          <img src={statue.type === "sunShroomStatue" ? "/other/sun-shroom-statue.webp" : "/other/sunflower-statue.webp"} alt={statue.type === "sunShroomStatue" ? "Sun-shroom statue" : "Sunflower statue"} className="h-full w-full object-contain" />
-                          {showDebugHealth && statue.hp !== undefined && <span className="absolute bottom-0 left-1/2 -translate-x-1/2 rounded bg-slate-950/80 px-1 text-[10px] text-white">HP: {statue.hp}</span>}
+                          <img src={statue.type === "sunShroomStatue" ? "/other/sun-shroom-statue.webp" : "/other/sunflower-statue.webp"} alt={t(statue.type === "sunShroomStatue" ? "Sun-shroom statue" : "Sunflower statue")} className="h-full w-full object-contain" />
+                          {showDebugHealth && statue.hp !== undefined && <span className="absolute bottom-0 left-1/2 -translate-x-1/2 rounded bg-slate-950/80 px-1 text-[10px] text-white">{t("HP")}: {statue.hp}</span>}
                         </div>
                       )}
                       {statue?.type === "grave" && (
                         <div className="absolute inset-0 z-10 pointer-events-none">
-                          <img src={statue.image} alt="Gravestone" className="h-full w-full object-contain" />
+                          <img src={statue.image} alt={t("Gravestone")} className="h-full w-full object-contain" />
                         </div>
                       )}
                       {tilePlants.map((tilePlant, plantIndex) => {
@@ -2762,7 +2815,7 @@ export default function GameScreen() {
                         <div key={tilePlant.id} className={`plant-idle absolute inset-0 z-10 h-full w-full text-xs text-lime-200 ${fusionTarget ? "plant-fusion-ready" : ""}`}>
                           <img
                             src={nut ? getNutDamageImage(tilePlant.type, stage) : getPlantImage(tilePlant.type)}
-                            alt={spec.name}
+                            alt={t(spec.name)}
                             className={`absolute h-full w-full object-contain ${sleeping ? "plant-sprite-sleeping" : ""}`}
                             style={{
                               ...offset,
@@ -2783,10 +2836,10 @@ export default function GameScreen() {
                               event.currentTarget.parentElement?.querySelector("[data-image-debug-health]")?.classList.add("hidden");
                             }}
                           />
-                          {sleeping && plantIndex === 0 && <span className="plant-sleeping-indicator" aria-label="Sleeping">Zzz</span>}
+                          {sleeping && plantIndex === 0 && <span className="plant-sleeping-indicator" aria-label={t("Sleeping")}>Zzz</span>}
                           <div className="relative z-10 hidden h-full w-full flex-col justify-between border border-lime-500/20 bg-lime-500/10 p-2">
-                            <span>{spec.name}</span>
-                            {showDebugHealth && <span className="text-[11px] text-slate-200">HP: {tilePlant.hp}</span>}
+                            <span>{t(spec.name)}</span>
+                            {showDebugHealth && <span className="text-[11px] text-slate-200">{t("HP")}: {tilePlant.hp}</span>}
                           </div>
                           {showDebugHealth && <span data-image-debug-health className="absolute bottom-0 left-1/2 z-10 -translate-x-1/2 text-[11px] text-slate-200">{tilePlant.hp}</span>}
                         </div>
@@ -2817,7 +2870,7 @@ export default function GameScreen() {
 
                 {introTextIndex !== null && currentLevel?.introTexts?.[introTextIndex] && (
                   <div className="lawn-intro-overlay" role="status" aria-live="polite">
-                    <p>{currentLevel?.introTexts?.[introTextIndex]}</p>
+                    <p>{t(currentLevel?.introTexts?.[introTextIndex] || "")}</p>
                   </div>
                 )}
 
@@ -2825,7 +2878,7 @@ export default function GameScreen() {
                   <div className="lawn-countdown-overlay" role="status" aria-live="assertive">
                     <img
                       src={`/other/${["ready", "set", "plant"][readyCountdownIndex]}.webp`}
-                      alt={["Ready", "Set", "Plant"][readyCountdownIndex]}
+                      alt={t(["Ready", "Set", "Plant"][readyCountdownIndex])}
                     />
                   </div>
                 )}
@@ -2834,7 +2887,7 @@ export default function GameScreen() {
                   <button
                     key={sunDrop.id}
                     type="button"
-                    aria-label={`Collect ${sunDrop.value} sun`}
+                    aria-label={t("Collect {amount} sun", { amount: sunDrop.value })}
                     onMouseEnter={(event) => collectSun(sunDrop.id, event.currentTarget)}
                     onFocus={(event) => collectSun(sunDrop.id, event.currentTarget)}
                     className={`absolute z-20 -translate-x-1/2 -translate-y-1/2 transition hover:scale-110 ${sunDrop.expiresAt - gameTime > 0 && sunDrop.expiresAt - gameTime <= 5000 ? "animate-pulse" : ""}`}
@@ -2860,7 +2913,7 @@ export default function GameScreen() {
                   <button
                     key={coin.id}
                     type="button"
-                    aria-label={`Collect $${coin.value}`}
+                    aria-label={t("Collect ${amount}", { amount: coin.value })}
                     onMouseEnter={(event) => collectCoin(coin.id, event.currentTarget)}
                     onFocus={(event) => collectCoin(coin.id, event.currentTarget)}
                     className="absolute z-20 -translate-x-1/2 -translate-y-1/2 transition hover:scale-110"
@@ -2876,7 +2929,7 @@ export default function GameScreen() {
                 {rewardDrop && (
                   <button
                     type="button"
-                    aria-label={rewardDrop.kind === "money" ? `Collect $${rewardDrop.value}` : "Collect level reward"}
+                    aria-label={rewardDrop.kind === "money" ? t("Collect ${amount}", { amount: rewardDrop.value || 0 }) : t("Collect level reward")}
                     onClick={collectReward}
                     className={`reward-drop reward-${rewardDrop.kind} reward-${rewardAnimation}`}
                     style={{
@@ -2965,7 +3018,7 @@ export default function GameScreen() {
                         className={`relative ${z.type === "gargantuar" || z.type === "horseman" ? "h-32 w-32" : z.type === "poleVaulting" ? "h-28 w-28" : z.type === "imp" ? "h-16 w-16" : "h-20 w-20"}`}
                         style={{ transform: `scale(${z.hypnotizedVisualScale || 1})`, transformOrigin: "bottom center" }}
                       >
-                        <img src={zombieImage} alt={getZombieLabel(z.type)} className="absolute inset-0 h-full w-full origin-bottom object-contain" />
+                        <img src={zombieImage} alt={t(getZombieLabel(z.type))} className="absolute inset-0 h-full w-full origin-bottom object-contain" />
                         {armorImage && (
                           <span
                             className="absolute origin-bottom"
@@ -2981,7 +3034,7 @@ export default function GameScreen() {
                           </span>
                         )}
                       </div>
-                      {showDebugHealth && <div className="mt-1 text-[10px] text-white text-center bg-rose-500/80 rounded-full px-2 py-0.5">HP: {z.hp}{z.armor > 0 ? ` | A: ${z.armor}` : ""}</div>}
+                      {showDebugHealth && <div className="mt-1 text-[10px] text-white text-center bg-rose-500/80 rounded-full px-2 py-0.5">{t("HP")}: {z.hp}{z.armor > 0 ? ` | ${t("A")}: ${z.armor}` : ""}</div>}
                     </div>
                   );
                 })}
@@ -3010,16 +3063,16 @@ export default function GameScreen() {
             </div>
 
             <div className="wave-status-row">
-              <div ref={coinBalanceRef} className="coin-balance" aria-label={`Player money: $${playerData.money}`}>
+              <div ref={coinBalanceRef} className="coin-balance" aria-label={t("Player money: ${amount}", { amount: playerData.money })}>
                 <img src="/other/silver-coin.webp" alt="" />
                 <strong>{playerData.money}</strong>
                 <span>$</span>
               </div>
-              <div className="wave-progress" aria-label={`Wave progress: ${completedWaveCount} of ${waveProgressSegments.length} waves spawned`}>
-                <div className="wave-progress-label"><span>Wave progress</span><span>{completedWaveCount} / {waveProgressSegments.length} waves</span></div>
+              <div className="wave-progress" aria-label={t("Wave progress: {completed} of {total} waves spawned", { completed: completedWaveCount, total: waveProgressSegments.length })}>
+                <div className="wave-progress-label"><span>{t("Wave progress")}</span><span>{completedWaveCount} / {waveProgressSegments.length} {t("waves")}</span></div>
                 <div className="wave-progress-track">
                   {waveProgressSegments.map((segment, index) => (
-                    <div key={`wave-${index}`} className="wave-progress-segment" aria-label={`${segment.isBoss ? "Boss " : ""}wave ${index + 1}`}>
+                    <div key={`wave-${index}`} className="wave-progress-segment" aria-label={`${segment.isBoss ? `${t("Boss")} ` : ""}${t("wave")} ${index + 1}`}>
                       <div className={`wave-progress-segment-fill ${segment.isBoss ? "boss" : ""}`} style={{ width: `${segment.progress}%` }} />
                     </div>
                   ))}
@@ -3050,12 +3103,12 @@ export default function GameScreen() {
       {challengeBriefingOpen && phase === "playing" && currentLevel?.challenges?.length && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 px-4" role="dialog" aria-modal="true" aria-labelledby="challenge-briefing-title">
           <section className="challenge-briefing">
-            <p className="loadout-kicker">Mission objectives</p>
-            <h2 id="challenge-briefing-title">{currentLevel.title} challenges</h2>
+            <p className="loadout-kicker">{t("Mission objectives")}</p>
+            <h2 id="challenge-briefing-title">{t(currentLevel.title)} {t("challenges")}</h2>
             <ul>
-              {currentLevel.challenges.map((challenge, index) => <li key={`${challenge.type}-${index}`}>{describeChallenge(challenge)}</li>)}
+              {currentLevel.challenges.map((challenge, index) => <li key={`${challenge.type}-${index}`}>{describeChallenge(challenge, playerData.language)}</li>)}
             </ul>
-            <button type="button" className="start-level-button" onClick={startChallengeCountdown}>Start level <span>→</span></button>
+            <button type="button" className="start-level-button" onClick={startChallengeCountdown}>{t("Start level")} <span>→</span></button>
           </section>
         </div>
       )}
@@ -3063,22 +3116,22 @@ export default function GameScreen() {
       {isPaused && phase === "playing" && (
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/60 px-4">
           <div className="pause-menu">
-            <h2>Paused</h2>
-            <button type="button" onClick={() => { setShowSettings(false); setIsPaused(false); }}>Resume</button>
-            <button type="button" onClick={() => setShowSettings(true)}>Settings</button>
-            <button type="button" onClick={() => openAlmanac("playing")}><img src="/other/almanac.webp" alt="" /> Almanac</button>
-            <button type="button" onClick={() => currentLevelRef.current && startLevel(currentLevelRef.current.id)}>Restart level</button>
-            <button type="button" onClick={returnToMenu}>Return to main menu</button>
+            <h2>{t("Paused")}</h2>
+            <button type="button" onClick={() => { setShowSettings(false); setIsPaused(false); }}>{t("Resume")}</button>
+            <button type="button" onClick={() => setShowSettings(true)}>{t("Settings")}</button>
+            <button type="button" onClick={() => openAlmanac("playing")}><img src="/other/almanac.webp" alt="" /> {t("Almanac")}</button>
+            <button type="button" onClick={() => currentLevelRef.current && startLevel(currentLevelRef.current.id)}>{t("Restart level")}</button>
+            <button type="button" onClick={returnToMenu}>{t("Return to main menu")}</button>
           </div>
         </div>
       )}
 
-      {isPaused && showSettings && phase === "playing" && (
+      {(isPaused && showSettings && phase === "playing") || showMenuSettings ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 px-4" role="dialog" aria-modal="true" aria-labelledby="settings-title">
           <div className="pause-menu settings-menu">
-            <h2 id="settings-title">Settings</h2>
+            <h2 id="settings-title">{t("Settings")}</h2>
             <label className="music-volume-control">
-              <span>Music volume</span>
+              <span>{t("Music volume")}</span>
               <strong>{Math.round(musicVolume * 100)}%</strong>
               <input
                 type="range"
@@ -3086,14 +3139,22 @@ export default function GameScreen() {
                 max="1"
                 step="0.1"
                 value={musicVolume}
-                aria-label="Music volume"
+                aria-label={t("Music volume")}
                 onChange={(event) => setMusicVolume(Number(event.currentTarget.value))}
               />
             </label>
-            <button type="button" onClick={() => setShowSettings(false)}>Back to pause menu</button>
+            <button
+              type="button"
+              onClick={() => {
+                if (showMenuSettings) setShowMenuSettings(false);
+                else setShowSettings(false);
+              }}
+            >
+              {t(showMenuSettings ? "Back to main menu" : "Back to pause menu")}
+            </button>
           </div>
         </div>
-      )}
+      ) : null}
 
       {(rewardlessTransition || (rewardDrop && (rewardAnimation === "unlocking" || rewardAnimation === "transition"))) && (
         <div className={`reward-white-overlay reward-overlay-${rewardlessTransition ? "empty" : rewardAnimation}`} aria-hidden="true" />
@@ -3122,8 +3183,8 @@ export default function GameScreen() {
       {gameOver && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4 py-8">
           <div className="w-full max-w-xl rounded-3xl border border-rose-400 bg-slate-900/95 p-8 text-center shadow-2xl">
-            <h2 className="text-3xl font-semibold text-white">Game Over</h2>
-            <p className="mt-4 text-slate-300">{gameOverMessage}</p>
+            <h2 className="text-3xl font-semibold text-white">{t("Game Over")}</h2>
+            <p className="mt-4 text-slate-300">{gameOverMessage === "A zombie reached your house. Try again!" ? t(gameOverMessage) : gameOverMessage}</p>
             <div className="mt-6 flex justify-center gap-4">
               <button
                 type="button"
@@ -3133,14 +3194,14 @@ export default function GameScreen() {
                 }}
                 className="inline-flex rounded-full bg-rose-500 px-6 py-3 text-lg font-semibold text-slate-950 transition hover:bg-rose-400"
               >
-                Retry Level
+                {t("Retry Level")}
               </button>
               <button
                 type="button"
                 onClick={() => returnToMenu()}
                 className="inline-flex rounded-full bg-slate-700 px-6 py-3 text-lg font-semibold text-white transition hover:bg-slate-600"
               >
-                Main Menu
+                {t("Main Menu")}
               </button>
             </div>
           </div>

@@ -2,7 +2,7 @@ export type BasePlantTypeKey = "sunflower" | "peaShooter" | "wallNut" | "chomper
 export type FusionPlantTypeKey = "peanut" | "sunNut" | "tallNut" | "chompNut" | "explodeONut" | "twinSunflower" | "sunBomb" | "sunChomper" | "sunshooter" | "repeater" | "chompShooter" | "cherryBomber" | "cherryChomper" | "frozenCherry" | "snowPeashooter" | "frostNut" | "sunShroom" | "nibbleShroom" | "peaShroom" | "miniNutShroom" | "miniIceShroom" | "miniHypnoShroom" | "brightShroom" | "gluttonShroom" | "triggerShroom" | "rushShroom" | "fumeNut" | "frostShroom" | "perfumeShroom" | "gloomShroom" | "hypnoChomper" | "hypnoNut" | "hypnoPea" | "cryonicShroom" | "catalystShroom" | "empressShroom" | "iceChomper" | "chomperMaw" | "iceShroom";
 export type PlantTypeKey = BasePlantTypeKey | FusionPlantTypeKey;
 export type LevelCategory = "day" | "night" | "pool" | "fog" | "roof" | "mini-game";
-export type GamePhase = "menu" | "category-select" | "level-select" | "shop" | "almanac" | "credits" | "loadout" | "playing" | "complete";
+export type GamePhase = "menu" | "category-select" | "level-select" | "shop" | "almanac" | "credits" | "language-settings" | "loadout" | "playing" | "complete";
 export type LevelChallenge =
   | { type: "produceSun"; amount: number }
   | { type: "maxSunSpent"; amount: number }
