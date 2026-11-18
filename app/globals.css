@@ -108,6 +108,78 @@ body {
   gap: 0.25rem;
 }
 
+.conveyor-belt {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  border: 2px solid #57351f;
+  border-radius: 0.35rem;
+  background: repeating-linear-gradient(90deg, #6e512f 0 1.8rem, #8b693c 1.8rem 2rem);
+  box-shadow: inset 0 0 0 2px rgb(255 230 166 / 28%);
+}
+
+.conveyor-card {
+  position: absolute;
+  top: 0;
+  display: grid;
+  height: 100%;
+  place-items: center;
+  padding: 0.15rem;
+  border: 2px solid #57351f;
+  background: linear-gradient(#b6d17c, #6f8b45);
+  transition: left 180ms linear, filter 120ms ease-out;
+}
+
+.conveyor-card.selected {
+  z-index: 1;
+  border-color: #fff3a1;
+  box-shadow: 0 0 0 2px #fff, inset 0 0 0 1px #d9e79f;
+}
+
+.conveyor-card img {
+  width: 2rem;
+  max-width: 100%;
+  height: 2rem;
+  max-height: 100%;
+  object-fit: contain;
+}
+
+.bowling-boundary-tile {
+  box-shadow: inset -4px 0 #ef4444, 3px 0 0 #991b1b;
+}
+
+.bowling-nut {
+  translate: -50% -50%;
+  animation: bowling-roll 700ms linear infinite;
+  pointer-events: none;
+}
+
+@keyframes bowling-roll {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.defense-planning-control {
+  position: absolute;
+  right: 1rem;
+  bottom: 1rem;
+  z-index: 40;
+  pointer-events: none;
+}
+
+.defense-planning-control button {
+  padding: 0.75rem 1rem;
+  border: 3px solid #4c2d1b;
+  border-radius: 0.6rem;
+  background: linear-gradient(#b5e879, #5c9d35);
+  color: #17330e;
+  font-weight: 900;
+  box-shadow: 0 0.25rem 0 #372116;
+  pointer-events: auto;
+}
+
 .seed-slot {
   position: relative;
   min-width: 3rem;

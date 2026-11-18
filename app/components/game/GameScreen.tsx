@@ -288,6 +288,23 @@ interface ExplosionEffect {
   }>;
 }
 
+interface ConveyorCard {
+  id: string;
+  type: PlantTypeKey;
+  x: number;
+}
+
+interface BowlingNut {
+  id: string;
+  type: PlantTypeKey;
+  row: number;
+  x: number;
+  y: number;
+  verticalDirection: -1 | 0 | 1;
+  hitZombieIds: string[];
+  firstHit: boolean;
+}
+
 interface ChallengeRunState {
   sunProduced: number;
   sunSpent: number;
@@ -358,7 +375,11 @@ const randomizeInterval = (interval: number): number => {
 
 export default function GameScreen() {
   const [phase, setPhase] = useState<GamePhase>("menu");
-  const [selectedPlant, setSelectedPlant] = useState<BasePlantTypeKey | null>(null);
+  const [selectedPlant, setSelectedPlant] = useState<PlantTypeKey | null>(null);
+  const [selectedConveyorCardId, setSelectedConveyorCardId] = useState<string | null>(null);
+  const [conveyorCards, setConveyorCards] = useState<ConveyorCard[]>([]);
+  const [bowlingNuts, setBowlingNuts] = useState<BowlingNut[]>([]);
+  const [isDefensePlanning, setIsDefensePlanning] = useState(false);
   const [selectedLoadout, setSelectedLoadout] = useState<BasePlantTypeKey[]>([]);
   const [almanacCategory, setAlmanacCategory] = useState<AlmanacCategory>("plants");
   const [almanacPlantKey, setAlmanacPlantKey] = useState<BasePlantTypeKey | null>(null);
@@ -430,6 +451,10 @@ export default function GameScreen() {
   const projectilesRef = useRef<Projectile[]>([]);
   const sunsRef = useRef<SunInstance[]>([]);
   const coinsRef = useRef<CoinInstance[]>([]);
+  const conveyorCardsRef = useRef<ConveyorCard[]>([]);
+  const bowlingNutsRef = useRef<BowlingNut[]>([]);
+  const conveyorNextSpawnAtRef = useRef(0);
+  const defensePlantTypesRef = useRef(new Set<BasePlantTypeKey>());
   const statuesRef = useRef<StatueInstance[]>([]);
   const zombieProjectilesRef = useRef<ZombieProjectile[]>([]);
   const sunRef = useRef(INITIAL_SUN);
@@ -633,6 +658,16 @@ export default function GameScreen() {
     setCoins(next);
   };
 
+  const setConveyorCardsState = (next: ConveyorCard[]) => {
+    conveyorCardsRef.current = next;
+    setConveyorCards(next);
+  };
+
+  const setBowlingNutsState = (next: BowlingNut[]) => {
+    bowlingNutsRef.current = next;
+    setBowlingNuts(next);
+  };
+
   const setSunState = (next: number) => {
     sunRef.current = next;
     setSun(next);
@@ -685,6 +720,12 @@ export default function GameScreen() {
     setProjectilesState([]);
     setSunsState([]);
     setCoinsState([]);
+    setConveyorCardsState([]);
+    setBowlingNutsState([]);
+    setSelectedConveyorCardId(null);
+    conveyorNextSpawnAtRef.current = 0;
+    defensePlantTypesRef.current.clear();
+    setIsDefensePlanning(false);
     statuesRef.current = [];
     setStatues([]);
     zombieProjectilesRef.current = [];
@@ -755,6 +796,7 @@ export default function GameScreen() {
     const now = currentTime();
 
     resetGameState();
+    setSunState(levelToStart.initialSun);
     setCurrentLevel(levelToStart);
     currentLevelRef.current = levelToStart;
     compiledLevelRef.current = compiledLevel;
@@ -781,15 +823,22 @@ export default function GameScreen() {
     setGameTime(now);
     setIsPaused(false);
     setSelectedLoadout([]);
-    setPhase("loadout");
+    if (levelToStart.mode === "conveyor" || levelToStart.mode === "wall-nut-bowling") {
+      setPhase("playing");
+      beginLevel();
+    } else {
+      setPhase("loadout");
+    }
   };
 
   const beginLevel = () => {
-    if (!currentLevelRef.current || selectedLoadout.length === 0) return;
+    if (!currentLevelRef.current) return;
+    const usesLoadout = !["conveyor", "wall-nut-bowling"].includes(currentLevelRef.current.mode);
+    if (usesLoadout && selectedLoadout.length === 0) return;
     const requiredPlantSets = currentLevelRef.current.challenges
       ?.filter((challenge): challenge is Extract<LevelChallenge, { type: "usePlant" }> => challenge.type === "usePlant")
       .map((challenge) => challenge.plants) || [];
-    if (requiredPlantSets.some((plantSet) => !plantSet.some((plant) => selectedLoadout.includes(plant)))) return;
+    if (usesLoadout && requiredPlantSets.some((plantSet) => !plantSet.some((plant) => selectedLoadout.includes(plant)))) return;
     const now = currentTime();
     spawnScheduleRef.current = {
       nextRegularSpawn: now + currentLevelRef.current.initialDelayMs,
@@ -809,6 +858,12 @@ export default function GameScreen() {
     };
     refreshChallengeProgress(now);
     setGameTime(now);
+    setIsDefensePlanning(false);
+    defensePlantTypesRef.current.clear();
+    setConveyorCardsState([]);
+    setBowlingNutsState([]);
+    setSelectedConveyorCardId(null);
+    conveyorNextSpawnAtRef.current = 0;
     setChallengeBriefingOpen(!currentLevelRef.current.introTexts?.length && Boolean(currentLevelRef.current.challenges?.length));
     setIntroTextIndex(currentLevelRef.current.introTexts?.length ? 0 : null);
     setReadyCountdownIndex(currentLevelRef.current.introTexts?.length || currentLevelRef.current.challenges?.length ? null : 0);
@@ -1044,6 +1099,8 @@ export default function GameScreen() {
 
   const handlePlacePlant = (row: number, col: number) => {
     if (phase !== "playing") return;
+    const level = currentLevelRef.current;
+    if (!level || !selectedPlant) return;
     const tilePlants = plantsRef.current.filter((plant) => plant.row === row && plant.col === col);
     const obstacle = statuesRef.current.find((item) => item.row === row && item.col === col);
     if (shovelSelected) {
@@ -1061,8 +1118,27 @@ export default function GameScreen() {
       return;
     }
     if (gloveSelected) return;
-    if (!selectedPlant) return;
     const tile = getPlayableTile(row, col);
+    if (level.mode === "wall-nut-bowling") {
+      if (col >= 3 || obstacle || !getTileDefinition(tile).canPlant) return;
+      const card = conveyorCardsRef.current.find((entry) => entry.id === selectedConveyorCardId);
+      if (!card || card.type !== selectedPlant) return;
+      const nextNuts = bowlingNutsRef.current.concat({
+        id: createId(),
+        type: selectedPlant,
+        row,
+        x: col + 0.5,
+        y: row + 0.5,
+        verticalDirection: 0,
+        hitZombieIds: [],
+        firstHit: true,
+      });
+      setBowlingNutsState(nextNuts);
+      setConveyorCardsState(conveyorCardsRef.current.filter((entry) => entry.id !== card.id));
+      setSelectedPlant(null);
+      setSelectedConveyorCardId(null);
+      return;
+    }
     const isGraveBuster = selectedPlant === "graveBuster";
     if (obstacle && !isGraveBuster) return;
     if (!obstacle && !getTileDefinition(tile).canPlant) return;
@@ -1071,8 +1147,15 @@ export default function GameScreen() {
     if (tilePlants.length > 0 && isGraveBuster) return;
     const now = gameTime;
     const spec = PLANT_SPECS[selectedPlant];
-    if (sunRef.current < spec.cost) return;
-    if (plantReadyRef.current[selectedPlant] > now) return;
+    const isConveyor = level.mode === "conveyor";
+    const skipsSunCost = isConveyor;
+    const skipsRecharge = isConveyor || isDefensePlanning;
+    const selectedCard = isConveyor
+      ? conveyorCardsRef.current.find((entry) => entry.id === selectedConveyorCardId)
+      : undefined;
+    if (isConveyor && (!selectedCard || selectedCard.type !== selectedPlant)) return;
+    if (!skipsSunCost && sunRef.current < spec.cost) return;
+    if (!skipsRecharge && isBasePlantType(selectedPlant) && plantReadyRef.current[selectedPlant] > now) return;
 
     let nextPlants = plantsRef.current.slice();
     if (tilePlants.length === 0 || (spec.puffStack && tilePlants.every((plant) => PLANT_SPECS[plant.type].puffStack))) {
@@ -1095,25 +1178,52 @@ export default function GameScreen() {
       nextPlants = nextPlants.map((plant) => plant.id === existingPlant.id ? newPlant : plant);
     }
     setPlantsState(nextPlants);
-    setSunState(sunRef.current - spec.cost);
-    challengeRunRef.current.sunSpent += spec.cost;
-    challengeRunRef.current.usedPlants.add(selectedPlant);
-    setPlantReadyState({
-      ...plantReadyRef.current,
-      [selectedPlant]: now + spec.rechargeMs,
-    });
+    if (!skipsSunCost) {
+      setSunState(sunRef.current - spec.cost);
+      challengeRunRef.current.sunSpent += spec.cost;
+    }
+    if (isBasePlantType(selectedPlant)) challengeRunRef.current.usedPlants.add(selectedPlant);
+    if (isDefensePlanning && isBasePlantType(selectedPlant)) defensePlantTypesRef.current.add(selectedPlant);
+    if (!skipsRecharge && isBasePlantType(selectedPlant)) {
+      setPlantReadyState({
+        ...plantReadyRef.current,
+        [selectedPlant]: now + spec.rechargeMs,
+      });
+    }
+    if (selectedCard) {
+      setConveyorCardsState(conveyorCardsRef.current.filter((entry) => entry.id !== selectedCard.id));
+      setSelectedConveyorCardId(null);
+    }
     setSelectedPlant(null);
-    const sunSpendLimit = currentLevelRef.current?.challenges
+    const sunSpendLimit = level.challenges
       ?.find((challenge): challenge is Extract<LevelChallenge, { type: "maxSunSpent" }> => challenge.type === "maxSunSpent");
     if (sunSpendLimit && challengeRunRef.current.sunSpent > sunSpendLimit.amount) {
       failChallenge(describeChallenge(sunSpendLimit, playerDataRef.current.language));
     }
     refreshChallengeProgress(now);
-    const plantCountLimit = currentLevelRef.current?.challenges
+    const plantCountLimit = level.challenges
       ?.find((challenge): challenge is Extract<LevelChallenge, { type: "maxPlantsOnLawn" }> => challenge.type === "maxPlantsOnLawn");
     if (plantCountLimit && nextPlants.length > plantCountLimit.amount) {
       failChallenge(describeChallenge(plantCountLimit, playerDataRef.current.language));
     }
+  };
+
+  const isBasePlantType = (type: PlantTypeKey): type is BasePlantTypeKey =>
+    BASE_PLANT_TYPES.includes(type as BasePlantTypeKey);
+
+  const startDefense = () => {
+    const level = currentLevelRef.current;
+    if (!level || level.mode !== "prepare-defense" || !isDefensePlanning) return;
+    const startedAt = currentTime();
+    spawnScheduleRef.current.nextRegularSpawn = startedAt + level.initialDelayMs;
+    nextSkySunAtRef.current = level.skySunIntervalMs ? startedAt + level.skySunIntervalMs : 0;
+    setPlantReadyState({
+      ...plantReadyRef.current,
+      ...Object.fromEntries([...defensePlantTypesRef.current].map((type) => [type, startedAt + PLANT_SPECS[type].rechargeMs])),
+    });
+    defensePlantTypesRef.current.clear();
+    setGameTime(startedAt);
+    setIsDefensePlanning(false);
   };
 
   const handleGlovePointerDown = (row: number, col: number) => {
@@ -1327,9 +1437,18 @@ export default function GameScreen() {
       if (readyCountdownIndex >= 2) {
         const startedAt = currentTime();
         if (currentLevelRef.current) {
-          spawnScheduleRef.current.nextRegularSpawn = startedAt + currentLevelRef.current.initialDelayMs;
-          nextSkySunAtRef.current = currentLevelRef.current.skySunIntervalMs
-            ? startedAt + currentLevelRef.current.skySunIntervalMs
+          if (currentLevelRef.current.mode === "prepare-defense") {
+            setIsDefensePlanning(true);
+            spawnScheduleRef.current.nextRegularSpawn = 0;
+            nextSkySunAtRef.current = 0;
+          } else {
+            spawnScheduleRef.current.nextRegularSpawn = startedAt + currentLevelRef.current.initialDelayMs;
+            nextSkySunAtRef.current = currentLevelRef.current.skySunIntervalMs
+              ? startedAt + currentLevelRef.current.skySunIntervalMs
+              : 0;
+          }
+          conveyorNextSpawnAtRef.current = currentLevelRef.current.conveyor
+            ? startedAt + currentLevelRef.current.conveyor.spawnIntervalMs
             : 0;
         }
         setGameTime(startedAt);
@@ -1452,7 +1571,7 @@ export default function GameScreen() {
     const waveInterval = currentLevel.waveSpawnIntervalMs;
     const betweenDelay = currentLevel.betweenWaveDelayMs;
 
-    if (currentLevel.skySunIntervalMs && now >= nextSkySunAtRef.current) {
+    if (currentLevel.skySunIntervalMs && !isDefensePlanning && now >= nextSkySunAtRef.current) {
       const plantableTiles = currentLevel.tiles.flatMap((tiles, row) =>
         tiles.map((tile, col) => ({ row, col })).filter(({ row, col }) => getTileDefinition(currentLevel.tiles[row][col]).canPlant),
       );
@@ -1483,6 +1602,7 @@ export default function GameScreen() {
       nextSkySunAtRef.current += currentLevel.skySunIntervalMs;
     }
 
+    if (!isDefensePlanning) {
     const compiledLevel = compiledLevelRef.current;
     const nextWave = compiledLevel?.spawnWaves[spawnState.batchIndex];
     const previousWaveHealth = regularBatchHealthRef.current;
@@ -1567,6 +1687,7 @@ export default function GameScreen() {
       } else {
         spawnState.nextWaveSpawn = now + waveInterval;
       }
+    }
     }
 
     const explodingCherryBombs = nextPlants.filter(
@@ -2214,6 +2335,96 @@ export default function GameScreen() {
       return { ...zombie, x: newX, contactStartedAt: undefined };
     });
 
+    const nextBowlingNuts = bowlingNutsRef.current
+      .map((nut) => {
+        const nextX = nut.x + 0.2;
+        let nextY = nut.y + nut.verticalDirection * 0.2;
+        let verticalDirection = nut.verticalDirection;
+        if (nextY < 0.25) {
+          nextY = 0.25 + (0.25 - nextY);
+          verticalDirection = 1;
+        } else if (nextY > gridRows - 0.25) {
+          nextY = gridRows - 0.25 - (nextY - (gridRows - 0.25));
+          verticalDirection = -1;
+        }
+        let nextNut = { ...nut, x: nextX, y: nextY, verticalDirection };
+        const hitIndex = nextZombies.findIndex((zombie) => zombie.hp > 0 && !zombie.hypnotized
+          && !nut.hitZombieIds.includes(zombie.id)
+          && Math.abs(zombie.x - nextX) <= ZOMBIE_HITBOX_HALF_WIDTH + 0.25
+          && Math.abs(zombie.row + 0.5 - nextY) <= 0.55);
+        if (hitIndex < 0) return nextNut;
+
+        const target = nextZombies[hitIndex];
+        const plantSpec = PLANT_SPECS[nut.type];
+        let hitZombieIds = [target.id];
+        if (nut.type === "explodeONut") {
+          createCherryExplosionEffect(target.row, target.x);
+          const blastCol = Math.floor(target.x);
+          damageStatuesInArea(target.row, blastCol, 1, 1000);
+          hitZombieIds = nextZombies
+            .filter((zombie) => !zombie.hypnotized
+              && zombie.hp > 0
+              && Math.abs(zombie.row - target.row) <= 1
+              && Math.abs(Math.floor(zombie.x) - blastCol) <= 1)
+            .map((zombie) => zombie.id);
+          nextZombies = nextZombies.map((zombie) =>
+            hitZombieIds.includes(zombie.id) ? applyZombieDamage(zombie, 1000, now) : zombie);
+        } else {
+          const damage = nut.type === "tallNut" ? 800 : nut.type === "chompNut" && nut.firstHit ? 1600 : 400;
+          let damagedTarget = applyZombieDamage(target, damage, now);
+          if (damagedTarget.hp > 0 && nut.type === "frostNut") {
+            damagedTarget = { ...damagedTarget, frozenUntil: Math.max(damagedTarget.frozenUntil || 0, now + 10000) };
+          }
+          if (damagedTarget.hp > 0 && nut.type === "hypnoNut" && random() < 0.5) {
+            damagedTarget = hypnotizeZombie(damagedTarget, now, plantSpec);
+          }
+          nextZombies[hitIndex] = damagedTarget;
+        }
+        nextNut = {
+          ...nextNut,
+          verticalDirection: random() < 0.5 ? -1 : 1,
+          hitZombieIds: [...new Set([...nut.hitZombieIds, ...hitZombieIds])],
+          firstHit: false,
+        };
+        return nextNut;
+      })
+      .filter((nut) => nut.x < gridCols + 0.5);
+
+    const nextConveyorCards = conveyorCardsRef.current
+      .slice()
+      .sort((first, second) => second.x - first.x)
+      .map((card, index, cards) => ({
+        ...card,
+        x: Math.max(cards[index + 1] ? cards[index + 1].x + 1 : 0, card.x - 0.12),
+      }));
+    const conveyorConfig = currentLevel.conveyor;
+    const conveyorCapacity = conveyorConfig?.capacity || 6;
+    if (conveyorConfig && ["conveyor", "wall-nut-bowling"].includes(currentLevel.mode)
+      && !isDefensePlanning && now >= conveyorNextSpawnAtRef.current
+      && nextConveyorCards.length < conveyorCapacity
+      && !nextConveyorCards.some((card) => card.x >= conveyorCapacity - 1)) {
+      const availablePlants = conveyorConfig.plants.filter(({ type, maxCount }) => {
+        const countOnLawn = nextPlants.filter((plant) => plant.type === type).length;
+        const countOnBelt = nextConveyorCards.filter((card) => card.type === type).length;
+        const countRolling = nextBowlingNuts.filter((nut) => nut.type === type).length;
+        return countOnLawn + countOnBelt + countRolling < maxCount;
+      });
+      const roll = random() * 100;
+      let cumulativeChance = 0;
+      const selectedSpawn = availablePlants.find(({ chance }) => {
+        cumulativeChance += chance;
+        return roll < cumulativeChance;
+      });
+      if (selectedSpawn) {
+        nextConveyorCards.push({
+          id: createId(),
+          type: selectedSpawn.type,
+          x: conveyorCapacity - 1,
+        });
+      }
+      conveyorNextSpawnAtRef.current = now + conveyorConfig.spawnIntervalMs;
+    }
+
     for (let index = 0; index < nextZombies.length; index += 1) {
       const attacker = nextZombies[index];
       if (attacker.hp <= 0 || !attacker.nextAttackTargetId || attacker.nextAttackTargetId.startsWith("statue:")
@@ -2322,6 +2533,8 @@ export default function GameScreen() {
       setZombieProjectiles(nextZombieProjectiles);
       setSunsState(nextSuns);
       setCoinsState(nextCoins);
+      setBowlingNutsState(nextBowlingNuts);
+      setConveyorCardsState(nextConveyorCards);
       explosionEffectsRef.current = nextExplosionEffects;
       setExplosionEffects(nextExplosionEffects);
       return;
@@ -2336,11 +2549,14 @@ export default function GameScreen() {
     setZombieProjectiles(nextZombieProjectiles);
     setSunsState(nextSuns);
     setCoinsState(nextCoins);
+    setBowlingNutsState(nextBowlingNuts);
+    setConveyorCardsState(nextConveyorCards);
     explosionEffectsRef.current = nextExplosionEffects;
     setExplosionEffects(nextExplosionEffects);
 
     if (
       !gameOverRef.current &&
+      !isDefensePlanning &&
       compiledLevelRef.current &&
       spawnedZombieCountRef.current === compiledLevelRef.current.totalZombieCount &&
       !nextZombies.some((zombie) => !zombie.hypnotized && zombie.hp > 0) &&
@@ -2356,7 +2572,7 @@ export default function GameScreen() {
       }
       finishLevel(lastDefeatedZombie);
     }
-  }, [gameTime, phase, currentLevel, isPaused, introTextIndex, challengeBriefingOpen, readyCountdownIndex, playerData.difficulty]);
+  }, [gameTime, phase, currentLevel, isPaused, introTextIndex, challengeBriefingOpen, readyCountdownIndex, isDefensePlanning, playerData.difficulty]);
 
   const grid = useMemo(
     () =>
@@ -2676,8 +2892,31 @@ export default function GameScreen() {
         {(phase === "playing" || phase === "complete") && (
           <div className="mt-6 space-y-4">
             <div className="game-toolbar">
-              <div ref={sunCounterRef} className="sun-counter" aria-label={`${sun} ${t("sun")} ${t("available")}`}><img className="sun-token" src="/other/sun.webp" alt="" /> <strong>{sun}</strong></div>
-              <div className="seed-tray" aria-label={t("Seed packet selection")} style={{ gridTemplateColumns: `repeat(${playerData.seedBankSize}, minmax(3rem, 4.4rem))` }}>
+              {!["conveyor", "wall-nut-bowling"].includes(currentLevel?.mode || "") && <div ref={sunCounterRef} className="sun-counter" aria-label={`${sun} ${t("sun")} ${t("available")}`}><img className="sun-token" src="/other/sun.webp" alt="" /> <strong>{sun}</strong></div>}
+              {currentLevel?.conveyor && ["conveyor", "wall-nut-bowling"].includes(currentLevel.mode) ? (
+                <div className="conveyor-belt" aria-label={t("Conveyor")}>
+                  {conveyorCards.map((card) => <button
+                    key={card.id}
+                    type="button"
+                    aria-label={t("Select {plant}", { plant: t(PLANT_SPECS[card.type].name) })}
+                    aria-pressed={selectedConveyorCardId === card.id}
+                    onClick={() => {
+                      setSelectedPlant(card.type);
+                      setSelectedConveyorCardId(card.id);
+                      setShovelSelected(false);
+                      setGloveSelected(false);
+                      setMovingPlantId(null);
+                    }}
+                    className={`conveyor-card ${selectedConveyorCardId === card.id ? "selected" : ""}`}
+                    style={{
+                      left: `${card.x / (currentLevel.conveyor?.capacity || 6) * 100}%`,
+                      width: `${100 / (currentLevel.conveyor?.capacity || 6)}%`,
+                    }}
+                  >
+                    <img src={getPlantImage(card.type)} alt="" />
+                  </button>)}
+                </div>
+              ) : !["conveyor", "wall-nut-bowling"].includes(currentLevel?.mode || "") ? <div className="seed-tray" aria-label={t("Seed packet selection")} style={{ gridTemplateColumns: `repeat(${playerData.seedBankSize}, minmax(3rem, 4.4rem))` }}>
                 {selectedLoadout.map((plantKey) => {
                   const spec = PLANT_SPECS[plantKey];
                   const ready = plantReady[plantKey] <= gameTime;
@@ -2693,9 +2932,9 @@ export default function GameScreen() {
                   );
                 })}
                 {Array.from({ length: Math.max(0, playerData.seedBankSize - selectedLoadout.length) }).map((_, index) => <div key={`empty-${index}`} className="seed-slot empty" aria-hidden="true" />)}
-              </div>
-              <button type="button" aria-label={t("Select shovel")} aria-keyshortcuts="1" onClick={selectShovel} className={`shovel-button ${shovelSelected ? "selected" : ""}`}><img src="/other/shovel.webp" alt="" /><kbd className="shortcut-hint">1</kbd></button>
-              {playerData.gloveUnlocked && <button type="button" aria-label={t("Select glove")} aria-keyshortcuts="2" onClick={selectGlove} disabled={gloveReadyAt > gameTime} className={`shovel-button glove-button ${gloveSelected ? "selected" : ""} ${gloveReadyAt > gameTime ? "unavailable" : ""}`}><img src="/other/glove.webp" alt="" /><kbd className="shortcut-hint">2</kbd>{gloveReadyAt > gameTime && <small>{Math.ceil((gloveReadyAt - gameTime) / 1000)}s</small>}</button>}
+              </div> : null}
+              {!["conveyor", "wall-nut-bowling"].includes(currentLevel?.mode || "") && <button type="button" aria-label={t("Select shovel")} aria-keyshortcuts="1" onClick={selectShovel} className={`shovel-button ${shovelSelected ? "selected" : ""}`}><img src="/other/shovel.webp" alt="" /><kbd className="shortcut-hint">1</kbd></button>}
+              {!["conveyor", "wall-nut-bowling"].includes(currentLevel?.mode || "") && playerData.gloveUnlocked && <button type="button" aria-label={t("Select glove")} aria-keyshortcuts="2" onClick={selectGlove} disabled={gloveReadyAt > gameTime} className={`shovel-button glove-button ${gloveSelected ? "selected" : ""} ${gloveReadyAt > gameTime ? "unavailable" : ""}`}><img src="/other/glove.webp" alt="" /><kbd className="shortcut-hint">2</kbd>{gloveReadyAt > gameTime && <small>{Math.ceil((gloveReadyAt - gameTime) / 1000)}s</small>}</button>}
               <button type="button" aria-label={t("Open pause menu")} aria-keyshortcuts="Escape" onClick={() => setIsPaused(true)} className="settings-button">⚙<kbd className="shortcut-hint">Esc</kbd></button>
             </div>
             {currentLevel?.challenges && currentLevel.challenges.some((challenge) => challenge.type !== "usePlant") && (
@@ -2770,9 +3009,9 @@ export default function GameScreen() {
                       }}
                       data-lawn-row={row}
                       data-lawn-col={col}
-                      disabled={Boolean(statue) && selectedPlant !== "graveBuster" || !tile.canPlant && selectedPlant !== "graveBuster"}
+                      disabled={Boolean(statue) && selectedPlant !== "graveBuster" || !tile.canPlant && selectedPlant !== "graveBuster" || currentLevel?.mode === "wall-nut-bowling" && col >= 3}
                       aria-label={t(tile.label || "Available lawn tile")}
-                      className={`relative min-h-16 overflow-visible p-2 text-left transition ${tile.className}`}
+                      className={`relative min-h-16 overflow-visible p-2 text-left transition ${tile.className} ${currentLevel?.mode === "wall-nut-bowling" && col === 2 ? "bowling-boundary-tile" : ""}`}
                     >
                       {statue && statue.type !== "grave" && (
                         <div className="absolute inset-0 z-10 pointer-events-none">
@@ -2868,6 +3107,25 @@ export default function GameScreen() {
                   );
                 })}
 
+                {bowlingNuts.map((nut) => {
+                  const xRatio = nut.x / gridCols;
+                  const yRatio = nut.y / gridRows;
+                  const xGapCorrection = Math.floor(nut.x) * 4 - xRatio * (gridCols - 1) * 4;
+                  const yGapCorrection = Math.floor(nut.y) * 4 - yRatio * (gridRows - 1) * 4;
+                  return <img
+                    key={nut.id}
+                    src={getPlantImage(nut.type)}
+                    alt=""
+                    aria-hidden="true"
+                    className="bowling-nut absolute z-20 h-14 w-14 object-contain"
+                    style={{
+                      left: `calc(${xRatio * 100}% ${xGapCorrection < 0 ? "-" : "+"} ${Math.abs(xGapCorrection)}px)`,
+                      top: `calc(${yRatio * 100}% ${yGapCorrection < 0 ? "-" : "+"} ${Math.abs(yGapCorrection)}px)`,
+                      transition: `left ${GAME_TICK_MS}ms linear, top ${GAME_TICK_MS}ms linear`,
+                    }}
+                  />;
+                })}
+
                 {introTextIndex !== null && currentLevel?.introTexts?.[introTextIndex] && (
                   <div className="lawn-intro-overlay" role="status" aria-live="polite">
                     <p>{t(currentLevel?.introTexts?.[introTextIndex] || "")}</p>
@@ -2882,6 +3140,8 @@ export default function GameScreen() {
                     />
                   </div>
                 )}
+
+                {isDefensePlanning && <div className="defense-planning-control"><button type="button" onClick={startDefense}>{t("Start waves")} <span>→</span></button></div>}
 
                 {suns.map((sunDrop) => (
                   <button

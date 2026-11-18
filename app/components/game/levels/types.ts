@@ -3,7 +3,7 @@
  */
 
 import type { TileType } from "../tiles";
-import type { LevelCategory, LevelChallenge, LevelReward } from "../types";
+import type { ConveyorConfig, LevelCategory, LevelChallenge, LevelMode, LevelReward } from "../types";
 
 export interface ZombieSpawn {
   type: "basic" | "imp" | "cone" | "bucket" | "gargantuar" | "wallNutZombie" | "peashooterZombie" | "horseman" | "undyingWraith" | "poleVaulting";
@@ -17,6 +17,8 @@ export interface WaveDefinition {
 
 export interface LevelDefinition {
   id: number;
+  mode?: LevelMode;
+  conveyor?: ConveyorConfig;
   category?: LevelCategory;
   unlockAfterLevelId?: number;
   title: string;
@@ -24,6 +26,7 @@ export interface LevelDefinition {
   introTexts?: string[];
   backgroundImage?: string;
   musicTrack?: string;
+  initialSun?: number;
   initialDelayMs: number;
   regularSpawnIntervalMs: number;
   betweenWaveDelayMs: number;
@@ -42,6 +45,8 @@ export interface LevelDefinition {
  */
 export interface CompiledLevelConfig {
   id: number;
+  mode: LevelMode;
+  conveyor?: ConveyorConfig;
   category: LevelCategory;
   unlockAfterLevelId?: number;
   title: string;
@@ -49,6 +54,7 @@ export interface CompiledLevelConfig {
   introTexts?: string[];
   backgroundImage?: string;
   musicTrack?: string;
+  initialSun: number;
   initialDelayMs: number;
   regularSpawnIntervalMs: number;
   betweenWaveDelayMs: number;

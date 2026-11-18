@@ -1,5 +1,6 @@
 import type { LevelConfig } from "../types";
 import type { CompiledLevelConfig, LevelDefinition, ZombieSpawn } from "./types";
+import { INITIAL_SUN, PLANT_SPECS } from "../constants";
 
 const validateTileMap = (tiles: LevelDefinition["tiles"], levelId: number) => {
   const width = tiles[0]?.length || 0;
@@ -13,6 +14,32 @@ const validateTileMap = (tiles: LevelDefinition["tiles"], levelId: number) => {
  */
 export function compileLevelDefinition(def: LevelDefinition): CompiledLevelConfig {
   validateTileMap(def.tiles, def.id);
+  const mode = def.mode || "standard";
+  if (def.initialSun !== undefined && (!Number.isInteger(def.initialSun) || def.initialSun < 0)) {
+    throw new Error(`Level ${def.id} initialSun must be a non-negative integer.`);
+  }
+  if ((mode === "conveyor" || mode === "wall-nut-bowling") && !def.conveyor) {
+    throw new Error(`Level ${def.id} requires conveyor configuration for ${mode} mode.`);
+  }
+  if (def.conveyor) {
+    if (!Number.isInteger(def.conveyor.spawnIntervalMs) || def.conveyor.spawnIntervalMs <= 0) {
+      throw new Error(`Level ${def.id} conveyor spawnIntervalMs must be a positive integer.`);
+    }
+    if (def.conveyor.capacity !== undefined && (!Number.isInteger(def.conveyor.capacity) || def.conveyor.capacity < 1)) {
+      throw new Error(`Level ${def.id} conveyor capacity must be a positive integer.`);
+    }
+    const totalChance = def.conveyor.plants.reduce((total, plant) => total + plant.chance, 0);
+    if (def.conveyor.plants.length === 0 || def.conveyor.plants.some((plant) =>
+      !Number.isFinite(plant.chance) || plant.chance < 0 || plant.chance > 100
+      || !Number.isInteger(plant.maxCount) || plant.maxCount < 1)) {
+      throw new Error(`Level ${def.id} conveyor plants need valid chances and positive maxCount values.`);
+    }
+    if (totalChance > 100) throw new Error(`Level ${def.id} conveyor plant chances cannot add up to more than 100.`);
+    if (mode === "wall-nut-bowling" && def.conveyor.plants.some((plant) =>
+      plant.type !== "wallNut" && !PLANT_SPECS[plant.type].fusionOf?.includes("wallNut"))) {
+      throw new Error(`Level ${def.id} wall-nut bowling conveyor can only contain Wall-nut plants.`);
+    }
+  }
 
   // Calculate total pre-wave zombies
   const regularWaves = def.waves.filter((wave) => !wave.bossWaves);
@@ -60,6 +87,8 @@ export function compileLevelDefinition(def: LevelDefinition): CompiledLevelConfi
 
   return {
     id: def.id,
+    mode,
+    conveyor: def.conveyor,
     category: def.category || "day",
     unlockAfterLevelId: def.unlockAfterLevelId,
     title: def.title,
@@ -67,6 +96,7 @@ export function compileLevelDefinition(def: LevelDefinition): CompiledLevelConfi
     introTexts: def.introTexts,
     backgroundImage: def.backgroundImage,
     musicTrack: def.musicTrack,
+    initialSun: def.initialSun ?? INITIAL_SUN,
     initialDelayMs: def.initialDelayMs,
     regularSpawnIntervalMs: def.regularSpawnIntervalMs,
     betweenWaveDelayMs: def.betweenWaveDelayMs,
@@ -94,6 +124,8 @@ export function compileLevelDefinition(def: LevelDefinition): CompiledLevelConfi
 export function toLevelConfig(compiled: CompiledLevelConfig): LevelConfig {
   return {
     id: compiled.id,
+    mode: compiled.mode,
+    conveyor: compiled.conveyor,
     category: compiled.category,
     unlockAfterLevelId: compiled.unlockAfterLevelId,
     title: compiled.title,
@@ -105,6 +137,7 @@ export function toLevelConfig(compiled: CompiledLevelConfig): LevelConfig {
     wave1Count: compiled.wave1Count,
     midCount: compiled.midCount,
     wave2Count: compiled.wave2Count,
+    initialSun: compiled.initialSun,
     initialDelayMs: compiled.initialDelayMs,
     regularSpawnIntervalMs: compiled.regularSpawnIntervalMs,
     betweenWaveDelayMs: compiled.betweenWaveDelayMs,

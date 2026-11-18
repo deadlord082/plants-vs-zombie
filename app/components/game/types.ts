@@ -2,6 +2,7 @@ export type BasePlantTypeKey = "sunflower" | "peaShooter" | "wallNut" | "chomper
 export type FusionPlantTypeKey = "peanut" | "sunNut" | "tallNut" | "chompNut" | "explodeONut" | "twinSunflower" | "sunBomb" | "sunChomper" | "sunshooter" | "repeater" | "chompShooter" | "cherryBomber" | "cherryChomper" | "frozenCherry" | "snowPeashooter" | "frostNut" | "sunShroom" | "nibbleShroom" | "peaShroom" | "miniNutShroom" | "miniIceShroom" | "miniHypnoShroom" | "brightShroom" | "gluttonShroom" | "triggerShroom" | "rushShroom" | "fumeNut" | "frostShroom" | "perfumeShroom" | "gloomShroom" | "hypnoChomper" | "hypnoNut" | "hypnoPea" | "cryonicShroom" | "catalystShroom" | "empressShroom" | "iceChomper" | "chomperMaw" | "iceShroom";
 export type PlantTypeKey = BasePlantTypeKey | FusionPlantTypeKey;
 export type LevelCategory = "day" | "night" | "pool" | "fog" | "roof" | "mini-game";
+export type LevelMode = "standard" | "prepare-defense" | "conveyor" | "wall-nut-bowling";
 export type GamePhase = "menu" | "category-select" | "level-select" | "shop" | "almanac" | "credits" | "language-settings" | "loadout" | "playing" | "complete";
 export type LevelChallenge =
   | { type: "produceSun"; amount: number }
@@ -20,6 +21,8 @@ export interface LevelReward {
 
 export interface LevelConfig {
   id: number;
+  mode: LevelMode;
+  conveyor?: ConveyorConfig;
   category: LevelCategory;
   unlockAfterLevelId?: number;
   title: string;
@@ -32,6 +35,7 @@ export interface LevelConfig {
   wave1Count: number;
   midCount: number;
   wave2Count: number;
+  initialSun: number;
   initialDelayMs: number;
   regularSpawnIntervalMs: number;
   betweenWaveDelayMs: number;
@@ -40,6 +44,16 @@ export interface LevelConfig {
   gloveRechargeMs: number;
   reward?: LevelReward;
   tiles: TileType[][];
+}
+
+export interface ConveyorConfig {
+  spawnIntervalMs: number;
+  capacity?: number;
+  plants: Array<{
+    type: PlantTypeKey;
+    chance: number;
+    maxCount: number;
+  }>;
 }
 
 export interface PlantSpec {

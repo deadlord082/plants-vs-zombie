@@ -50,7 +50,7 @@ This repository is a Next.js remake of Plants vs. Zombies. The main game screen 
 - Completion rewards and plant unlocks are granted only the first time a level is completed. Replaying a completed level must not grant its reward again, though the level remains playable.
 - A replayed completed level must still use the rewardless completion transition rather than returning abruptly to the level selector.
 - The level selector displays completed levels, and the main menu displays the player's money and seed capacity.
-- The player starts with five base-plant seed slots. The Shop offers exactly two one-time seed-slot purchases, costing `$50,000` and `$80,000`; no further purchases are available after both upgrades. Fusion plants never consume loadout slots.
+- The player starts with five base-plant seed slots. The Shop offers exactly two one-time seed-slot purchases, costing `$5,000` and `$8,000`; no further purchases are available after both upgrades. Fusion plants never consume loadout slots.
 - Money must remain a non-negative integer. Collectible coin money is added to the same persisted player balance.
 
 ### Zombie Coin Drops
