@@ -4,7 +4,8 @@ export const LEVEL_2_1: LevelDefinition = {
   id: 201,
   category: "night",
   unlockAfterLevelId: 0,
-  title: "Your first-night",
+  initialSun: 150,
+  title: "The First Night",
   description: "",
   introTexts: [
     "During the night, sun does not fall from the sky.",
@@ -26,5 +27,11 @@ export const LEVEL_2_1: LevelDefinition = {
     ["normalDark", "normal", "normalDark", "normal", "normalDark", "normal", "normalDark", "normal"],
   ],
   waves: [
+    { zombies: [{ type: "basic", count: 1 }] },
+    { zombies: [{ type: "basic", count: 2 }] },
+    { zombies: [{ type: "cone", count: 1 }] },
+    { zombies: [{ type: "basic", count: 3 }] },
+    { zombies: [{ type: "basic", count: 3 }, { type: "cone", count: 1 }] },
+    { zombies: [{ type: "basic", count: 10 }, { type: "cone", count: 4 }, { type: "bucket", count: 2 }], bossWaves: true },
   ],
 };

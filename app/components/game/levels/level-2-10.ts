@@ -1,0 +1,45 @@
+import type { LevelDefinition } from "./types";
+
+export const LEVEL_2_10: LevelDefinition = {
+  id: 210,
+  category: "night",
+  unlockAfterLevelId: 209,
+  mode: "conveyor",
+  conveyor: {
+    spawnIntervalMs: 4000,
+    capacity: 20,
+    plants: [
+      { type: "chomper", chance: 20, maxCount: 6 },
+      { type: "hypnoShroom", chance: 20, maxCount: 6 },
+      { type: "icebergLettuce", chance: 20, maxCount: 6 },
+      { type: "cherryBomb", chance: 20, maxCount: 6 },
+      { type: "tallNut", chance: 20, maxCount: 6 },
+    ],
+  },
+  initialSun: 150,
+  title: "Football Frenzy",
+  description: "",
+  initialDelayMs: 20000,
+  regularSpawnIntervalMs: 30000,
+  betweenWaveDelayMs: 3000,
+  waveSpawnIntervalMs: 1200,
+  backgroundImage: "/other/bg-night.webp",
+  musicTrack: "/sound/night.mp3",
+  reward: { unlockPlants: ["hypnoShroom"] },
+  tiles: [
+    ["normal", "normalDark", "normal", "grave", "normal", "normalDark", "normal", "normalDark"],
+    ["normalDark", "normal", "normalDark", "normal", "normalDark", "normal", "grave", "normal"],
+    ["normal", "normalDark", "normal", "grave", "normal", "normalDark", "normal", "normalDark"],
+    ["normalDark", "normal", "normalDark", "normal", "normalDark", "normal", "grave", "normal"],
+    ["normal", "normalDark", "normal", "grave", "normal", "normalDark", "normal", "normalDark"],
+    ["normalDark", "normal", "normalDark", "normal", "normalDark", "normal", "grave", "normal"],
+  ],
+  waves: [
+    { zombies: [{ type: "bucket", count: 1 }] },
+    { zombies: [{ type: "bucket", count: 2 }] },
+    { zombies: [{ type: "footballZombie", count: 2 }] },
+    { zombies: [{ type: "footballZombie", count: 3 }, { type: "bucket", count: 2 }] },
+    { zombies: [{ type: "footballZombie", count: 4 }, { type: "bucket", count: 2 }] },
+    { zombies: [{ type: "footballZombie", count: 13 }, { type: "bucket", count: 4 }], bossWaves: true },
+  ],
+};

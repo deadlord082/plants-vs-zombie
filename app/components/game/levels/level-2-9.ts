@@ -1,0 +1,40 @@
+import type { LevelDefinition } from "./types";
+
+export const LEVEL_2_9: LevelDefinition = {
+  id: 209,
+  category: "night",
+  unlockAfterLevelId: 208,
+  initialSun: 150,
+  title: "Relentless Night",
+  description: "",
+  initialDelayMs: 20000,
+  regularSpawnIntervalMs: 30000,
+  betweenWaveDelayMs: 3000,
+  waveSpawnIntervalMs: 1200,
+  backgroundImage: "/other/bg-night.webp",
+  musicTrack: "/sound/night.mp3",
+  challenges: [
+    { type: "maxSunSpent", amount: 3500 },
+  ],
+  reward: { money: 200 },
+  tiles: [
+    ["normal", "normalDark", "normal", "grave", "normal", "normalDark", "normal", "normalDark"],
+    ["normalDark", "normal", "normalDark", "normal", "normalDark", "normal", "grave", "normal"],
+    ["normal", "normalDark", "normal", "grave", "normal", "normalDark", "normal", "normalDark"],
+    ["normalDark", "normal", "normalDark", "normal", "normalDark", "normal", "grave", "normal"],
+    ["normal", "normalDark", "normal", "grave", "normal", "normalDark", "normal", "normalDark"],
+    ["normalDark", "normal", "normalDark", "normal", "normalDark", "normal", "grave", "normal"],
+  ],
+  waves: [
+    { zombies: [{ type: "basic", count: 2 }] },
+    { zombies: [{ type: "basic", count: 4 }] },
+    { zombies: [{ type: "basic", count: 6 }, { type: "cone", count: 3 }, { type: "poleVaulting", count: 2 }] },
+    { zombies: [{ type: "basic", count: 5 }, { type: "bucket", count: 2 }, { type: "undyingWraith", count: 3 }, { type: "screenDoorZombie", count: 2 }] },
+    { zombies: [{ type: "basic", count: 6 }, { type: "cone", count: 4 }, { type: "bucket", count: 2 }, { type: "screenDoorZombie", count: 3 }], bossWaves: true },
+    { zombies: [{ type: "basic", count: 6 }, { type: "undyingWraith", count: 3 }, { type: "poleVaulting", count: 3 }] },
+    { zombies: [{ type: "cone", count: 6 }, { type: "undyingWraith", count: 6 }, { type: "screenDoorZombie", count: 6 }] },
+    { zombies: [{ type: "basic", count: 7 }, { type: "cone", count: 8 }, { type: "screenDoorZombie", count: 8 }, { type: "undyingWraith", count: 8 }], bossWaves: true },
+    { zombies: [{ type: "screenDoorZombie", count: 6 }, { type: "bucket", count: 6 }, { type: "poleVaulting", count: 9 }] },
+    { zombies: [{ type: "screenDoorZombie", count: 10 }, { type: "bucket", count: 10 }, { type: "poleVaulting", count: 10 }, { type: "screenDoorZombie", count: 10 }], bossWaves: true },
+  ],
+};

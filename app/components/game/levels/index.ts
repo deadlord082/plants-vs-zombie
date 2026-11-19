@@ -25,6 +25,14 @@ import { compileLevelDefinition, toLevelConfig } from "./loader";
 import type { LevelConfig } from "../types";
 import { LEVEL_2_1 } from "./level-2-1";
 import { LEVEL_2_2 } from "./level-2-2";
+import { LEVEL_2_3 } from "./level-2-3";
+import { LEVEL_2_4 } from "./level-2-4";
+import { LEVEL_2_6 } from "./level-2-6";
+import { LEVEL_2_5 } from "./level-2-5";
+import { LEVEL_2_7 } from "./level-2-7";
+import { LEVEL_2_8 } from "./level-2-8";
+import { LEVEL_2_9 } from "./level-2-9";
+import { LEVEL_2_10 } from "./level-2-10";
 
 // Compile all level definitions
 const COMPILED_LEVELS = [
@@ -51,6 +59,14 @@ const COMPILED_LEVELS = [
   LEVEL_20,
   LEVEL_2_1,
   LEVEL_2_2,
+  LEVEL_2_3,
+  LEVEL_2_4,
+  LEVEL_2_5,
+  LEVEL_2_6,
+  LEVEL_2_7,
+  LEVEL_2_8,
+  LEVEL_2_9,
+  LEVEL_2_10,
   LEVEL_12Lanes,
   LEVEL_test,
 ].map(compileLevelDefinition);

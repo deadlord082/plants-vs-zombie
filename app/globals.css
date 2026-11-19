@@ -145,6 +145,13 @@ body {
   object-fit: contain;
 }
 
+.wall-nut-bowling-conveyor .conveyor-card img {
+  width: 4rem;
+  max-width: none;
+  height: 4rem;
+  max-height: none;
+}
+
 .bowling-boundary-tile {
   box-shadow: inset -4px 0 #ef4444, 3px 0 0 #991b1b;
 }
@@ -1185,6 +1192,52 @@ body {
   transform: translateX(-50%);
 }
 
+.zombie-choice-art .football-helmet-choice {
+  top: -2%;
+  left: 40%;
+  width: 50%;
+  height: 50%;
+}
+
+.zombie-choice-art .screen-door-choice-door {
+  top: 14%;
+  left: 18%;
+  width: 62%;
+  height: 76%;
+}
+
+.zombie-art .zombie-helmet-preview {
+  top: 10%;
+  left: 40%;
+  width: 34%;
+  height: 34%;
+  transform: translateX(-50%);
+}
+
+.zombie-art .football-helmet-preview {
+  top: 24%;
+  left: 40%;
+  width: 38%;
+  height: 38%;
+  transform: translateX(-50%);
+}
+
+.zombie-art .zombie-screen-door-preview {
+  top: 26%;
+  left: 18%;
+  width: 54%;
+  height: 65%;
+}
+
+.zombie-death {
+  animation: zombie-death-fall 1200ms ease-in forwards;
+  transform-origin: bottom center;
+}
+
+.zombie-screen-door {
+  z-index: 1;
+}
+
 .zombie-choice strong,
 .zombie-choice small {
   display: block;
@@ -2027,6 +2080,23 @@ body {
   100% {
     opacity: 0;
     transform: translateY(2rem) rotate(18deg) scale(0.85);
+  }
+}
+
+@keyframes zombie-death-fall {
+  0% {
+    opacity: 1;
+    transform: scale(var(--zombie-death-scale, 1)) rotate(0deg);
+  }
+
+  55% {
+    opacity: 0.85;
+    transform: scale(var(--zombie-death-scale, 1)) rotate(90deg) translateX(18%);
+  }
+
+  100% {
+    opacity: 0.8;
+    transform: scale(var(--zombie-death-scale, 1)) rotate(90deg) translateX(18%);
   }
 }
 

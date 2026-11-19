@@ -160,6 +160,8 @@ const getPlantDamageStage = (plantType: PlantTypeKey, hp: number) =>
 const getZombieImage = (zombieType: string) => ({
   imp: "/zombie/imp.webp",
   gargantuar: "/zombie/gargantuar.webp",
+  footballZombie: "/zombie/football-zombie.webp",
+  chickenJockeyZombie: "/zombie/chicken-jockey-zombie.webp",
   wallNutZombie: "/zombie/wall-nut-zombie.webp",
   peashooterZombie: "/zombie/peashooter-zombie.webp",
   horseman: "/zombie/zombie-horseman.webp",
@@ -167,16 +169,30 @@ const getZombieImage = (zombieType: string) => ({
   poleVaulting: "/zombie/pole-vaulting-zombie.webp",
 }[zombieType] || "/zombie/zombie.webp");
 
+const getZombieArmorPreviewImage = (zombieType: string) => ({
+  cone: "/zombie/cone.webp",
+  bucket: "/zombie/bucket.webp",
+  footballZombie: "/zombie/football-zombie-helmet.webp",
+  screenDoorZombie: "/zombie/screen-door.webp",
+}[zombieType]);
+
 const getZombieArmorImage = (zombieType: string, armor: number, armorBrokenAt?: number, now = Date.now()) => {
   const armorSpec = zombieType === "cone"
     ? { max: 360, stage: 120, damaged: "/zombie/cone-damaged.webp", heavilyDamaged: "/zombie/cone-heavely-damaged.webp" }
     : zombieType === "bucket"
       ? { max: 1000, stage: 350, damaged: "/zombie/bucket-damaged.webp", heavilyDamaged: "/zombie/bucket-heavely-damaged.webp" }
+      : zombieType === "footballZombie"
+        ? { max: 1000, stage: 350, damaged: "/zombie/football-zombie-helmet-damaged.webp", heavilyDamaged: "/zombie/football-zombie-helmet-heavely-damaged.webp" }
+        : zombieType === "screenDoorZombie"
+          ? { max: 1000, stage: 350, damaged: "/zombie/screen-door-damaged.webp", heavilyDamaged: "/zombie/screen-door-heavely-damaged.webp" }
       : null;
   if (!armorSpec || (armor <= 0 && (!armorBrokenAt || now - armorBrokenAt >= 2000))) return null;
   if (armor <= armorSpec.stage || armorBrokenAt) return armorSpec.heavilyDamaged;
   if (armor <= armorSpec.max - armorSpec.stage) return armorSpec.damaged;
-  return zombieType === "cone" ? "/zombie/cone.webp" : "/zombie/bucket.webp";
+  return zombieType === "cone" ? "/zombie/cone.webp"
+    : zombieType === "footballZombie" ? "/zombie/football-zombie-helmet.webp"
+      : zombieType === "screenDoorZombie" ? "/zombie/screen-door.webp"
+        : "/zombie/bucket.webp";
 };
 
 const getZombieLabel = (zombieType: string) => zombieType === "basic"
@@ -187,13 +203,15 @@ const getZombieLabel = (zombieType: string) => zombieType === "basic"
         ? "Buckethead zombie"
           : ZOMBIE_SPECS[zombieType]?.name || zombieType;
 
-const applyZombieDamage = (zombie: ZombieInstance, damage: number, now: number): ZombieInstance => {
+const applyZombieDamage = (zombie: ZombieInstance, damage: number, now: number, bypassArmor = false): ZombieInstance => {
   const armorDamage = Math.min(zombie.armor, damage);
-  const armor = zombie.armor - armorDamage;
+  const armor = bypassArmor ? 0 : zombie.armor - armorDamage;
+  const hp = Math.max(0, zombie.hp - (bypassArmor ? damage : damage - armorDamage));
   return {
     ...zombie,
     armor,
-    hp: Math.max(0, zombie.hp - (damage - armorDamage)),
+    hp,
+    deathStartedAt: hp === 0 ? zombie.deathStartedAt ?? now : zombie.deathStartedAt,
     armorBrokenAt: zombie.armor > 0 && armor === 0 ? now : zombie.armorBrokenAt,
   };
 };
@@ -1715,15 +1733,27 @@ export default function GameScreen() {
           : zombieType === "bucket"
             ? "Buckethead zombie"
             : "Gargantuar";
-    const applyZombieDamage = (zombie: ZombieInstance, damage: number, now: number): ZombieInstance => {
+    const applyZombieDamage = (
+      zombie: ZombieInstance,
+      damage: number,
+      now: number,
+      bypassArmor = false,
+      damageScreenDoorAndZombie = false,
+    ): ZombieInstance => {
       const adjustedDamage = Math.max(0, Math.round(damage * difficultySettings.damageTakenMultiplier));
-      const armorDamage = Math.min(zombie.armor, adjustedDamage);
-      const armor = zombie.armor - armorDamage;
+      const armorDamage = bypassArmor || damageScreenDoorAndZombie ? 0 : Math.min(zombie.armor, adjustedDamage);
+      const armor = bypassArmor ? 0 : zombie.armor - armorDamage;
+      const hpDamage = bypassArmor || damageScreenDoorAndZombie ? adjustedDamage : adjustedDamage - armorDamage;
+      const hp = Math.max(0, zombie.hp - hpDamage);
+      const nextArmor = damageScreenDoorAndZombie
+        ? Math.max(0, zombie.armor - adjustedDamage)
+        : armor;
       return {
         ...zombie,
-        armor,
-        hp: Math.max(0, zombie.hp - (adjustedDamage - armorDamage)),
-        armorBrokenAt: zombie.armor > 0 && armor === 0 ? now : zombie.armorBrokenAt,
+        armor: nextArmor,
+        hp,
+        deathStartedAt: hp === 0 ? zombie.deathStartedAt ?? now : zombie.deathStartedAt,
+        armorBrokenAt: zombie.armor > 0 && nextArmor === 0 ? now : zombie.armorBrokenAt,
       };
     };
     const markDamage = (zombie: ZombieInstance, damage: number, sunOnKill = 0) => {
@@ -1957,7 +1987,13 @@ export default function GameScreen() {
             const fumeDamage = plant.type === "gluttonShroom" && plant.hasEaten
               ? (plantSpec.damage || 30) * 2
               : plantSpec.damage || 30;
-            let damaged = applyZombieDamage(zombie, fumeDamage, now);
+            let damaged = applyZombieDamage(
+              zombie,
+              fumeDamage,
+              now,
+              false,
+              zombie.type === "screenDoorZombie",
+            );
             if (plantSpec.fumeFreezeDurationMs) {
               damaged = { ...damaged, frozenUntil: Math.max(damaged.frozenUntil || 0, now + plantSpec.fumeFreezeDurationMs) };
             }
@@ -2171,7 +2207,12 @@ export default function GameScreen() {
         } else {
           nextZombies = nextZombies.map((z) => {
             if (!hitZombies.some((hit) => hit.id === z.id)) return z;
-            const damaged = z.hypnotized ? z : applyZombieDamage(z, moved.damage, now);
+            const damaged = z.hypnotized ? z : applyZombieDamage(
+              z,
+              moved.damage,
+              now,
+              moved.pierces && z.type === "screenDoorZombie",
+            );
             let result = moved.freezeDurationMs ? { ...damaged, frozenUntil: Math.max(damaged.frozenUntil || 0, now + moved.freezeDurationMs) } : damaged;
             if (result.hp > 0 && moved.hypnotizeChance && random() < moved.hypnotizeChance) result = hypnotizeZombie(result, now, PLANT_SPECS.hypnoPea);
             return result;
@@ -2193,6 +2234,9 @@ export default function GameScreen() {
     // Move zombies smoothly leftward; do not interact with plants or projectiles
     const walkPeriodMs = 3000; // 1.5 second walking cycle
     nextZombies = nextZombies.map((zombie) => {
+      if (zombie.hp <= 0) {
+        return { ...zombie, deathStartedAt: zombie.deathStartedAt ?? now };
+      }
       const zombieSpec = ZOMBIE_SPECS[zombie.type] || ZOMBIE_SPECS.basic;
       if (zombie.poleVaultStartedAt !== undefined && zombie.poleVaultTargetX !== undefined && zombie.poleVaultingUntil) {
         const progress = Math.min(1, (now - zombie.poleVaultStartedAt) / 2000);
@@ -2465,6 +2509,15 @@ export default function GameScreen() {
       });
     }
 
+    nextZombies = nextZombies.map((zombie) => {
+      if (zombie.hp > 0) return zombie;
+      return {
+        ...zombie,
+        armor: zombie.type === "screenDoorZombie" ? 0 : zombie.armor,
+        deathStartedAt: zombie.deathStartedAt ?? now,
+      };
+    });
+
     nextZombies.forEach((zombie) => {
       if (zombie.hp > 0 || defeatedZombieIdsRef.current.has(zombie.id)) return;
       defeatedZombieIdsRef.current.add(zombie.id);
@@ -2521,12 +2574,12 @@ export default function GameScreen() {
     recordPlantLosses();
     nextPlants = nextPlants.filter((plant) => plant.hp > 0);
     // Check for game over: any zombie that crosses the left trigger X
-    const anyReachedEnd = nextZombies.some((z) => !z.hypnotized && z.x <= ZOMBIE_LEFT_TRIGGER_X);
+    const anyReachedEnd = nextZombies.some((z) => z.hp > 0 && !z.hypnotized && z.x <= ZOMBIE_LEFT_TRIGGER_X);
     if (anyReachedEnd) {
       setGameOver(true);
       gameOverRef.current = true;
       // stop updating zombies and plants further for this tick
-      setZombiesState(nextZombies.filter((z) => z.hp > 0));
+      setZombiesState(nextZombies.filter((z) => z.hp > 0 || z.deathStartedAt !== undefined));
       setPlantsState(nextPlants);
       setProjectilesState(nextProjectiles);
       zombieProjectilesRef.current = nextZombieProjectiles;
@@ -2540,7 +2593,9 @@ export default function GameScreen() {
       return;
     }
 
-    nextZombies = nextZombies.filter((zombie) => zombie.hp > 0 && (!zombie.hypnotized || zombie.x < gridCols + 1));
+    nextZombies = nextZombies.filter((zombie) =>
+      (zombie.hp > 0 || zombie.deathStartedAt !== undefined && now - zombie.deathStartedAt < 1500)
+      && (!zombie.hypnotized || zombie.x < gridCols + 1));
 
     setPlantsState(nextPlants);
     setZombiesState(nextZombies);
@@ -2838,7 +2893,12 @@ export default function GameScreen() {
                   && spec.fusionOf.every((ingredient) => playerData.unlockedPlants.includes(ingredient)))
                   .map((spec) => <article key={spec.key} className="almanac-card"><div className="almanac-art plant-art"><img src={getPlantImage(spec.key)} alt="" /></div><div><p className="almanac-type">{t("Fusion plant")}</p><h3>{t(spec.name)}</h3><p>{t(spec.summary)}</p><p className="almanac-recipe">{t("Requires {partners}", { partners: spec.fusionOf?.map((key) => t(PLANT_SPECS[key].name)).join(" + ") || "" })}</p><dl><div><dt>{t("Health")}</dt><dd>{spec.hp} {t("HP")}</dd></div>{spec.damage !== undefined && <div><dt>{t("Damage")}</dt><dd>{spec.damage}</dd></div>}{spec.shootMs && <div><dt>{t("Attack interval")}</dt><dd>{Math.round(spec.shootMs * (spec.fireRateMultiplier || 1) / 100) / 10}s</dd></div>}{spec.generateAmount && <div><dt>{t("Sun per burst")}</dt><dd>{spec.generateAmount}</dd></div>}{spec.generateMs && <div><dt>{t("Sun interval")}</dt><dd>{spec.generateMs / 1000}s</dd></div>}{spec.hypnotizeChance && <div><dt>{t("Hypnotize chance")}</dt><dd>{spec.hypnotizeChance * 100}%</dd></div>}{spec.freezeDurationMs && <div><dt>{t("Freeze duration")}</dt><dd>{spec.freezeDurationMs / 1000}s</dd></div>}</dl></div></article>)}
               </>}
-              {almanacCategory === "zombies" && Object.values(ZOMBIE_SPECS).filter((spec) => (playerData.zombieKills[spec.key] || 0) > 0).map((spec) => <article key={spec.key} className="almanac-card"><div className="almanac-art zombie-art relative"><img src={getZombieImage(spec.key)} alt="" />{(spec.key === "cone" || spec.key === "bucket") && <img src={spec.key === "cone" ? "/zombie/cone.webp" : "/zombie/bucket.webp"} alt="" className="absolute object-contain" style={{ width: "33.333%", height: "33.333%", left: "40%", top: "18%", transform: "translateX(-50%)" }} />}</div><div><p className="almanac-type">{t("Zombie")}</p><h3>{t(spec.name)}</h3><p>{t(spec.summary)}</p><dl><div><dt>{t("Defeated")}</dt><dd>{playerData.zombieKills[spec.key]}</dd></div><div><dt>{t("Health")}</dt><dd>{spec.hp} {t("HP")}</dd></div><div><dt>{t("Speed")}</dt><dd>{Math.round(spec.moveMs / 100) / 10}s / {t("tile")}</dd></div><div><dt>{t("Damage")}</dt><dd>{spec.damage}</dd></div><div><dt>{t("Attack")}</dt><dd>{spec.attackMs / 1000}s</dd></div><div><dt>{t("Armor")}</dt><dd>{spec.armor}</dd></div></dl></div></article>)}
+              {almanacCategory === "zombies" && Object.values(ZOMBIE_SPECS)
+                .filter((spec) => (playerData.zombieKills[spec.key] || 0) > 0)
+                .map((spec) => {
+                  const armorImage = getZombieArmorPreviewImage(spec.key);
+                  return <article key={spec.key} className="almanac-card"><div className="almanac-art zombie-art relative"><img src={getZombieImage(spec.key)} alt="" />{armorImage && <img src={armorImage} alt="" className={`absolute object-contain ${spec.key === "screenDoorZombie" ? "zombie-screen-door-preview" : spec.key === "footballZombie" ? "football-helmet-preview" : "zombie-helmet-preview"}`} />}</div><div><p className="almanac-type">{t("Zombie")}</p><h3>{t(spec.name)}</h3><p>{t(spec.summary)}</p><dl><div><dt>{t("Defeated")}</dt><dd>{playerData.zombieKills[spec.key]}</dd></div><div><dt>{t("Health")}</dt><dd>{spec.hp} {t("HP")}</dd></div><div><dt>{t("Speed")}</dt><dd>{Math.round(spec.moveMs / 100) / 10}s / {t("tile")}</dd></div><div><dt>{t("Damage")}</dt><dd>{spec.damage}</dd></div><div><dt>{t("Attack")}</dt><dd>{spec.attackMs / 1000}s</dd></div><div><dt>{t("Armor")}</dt><dd>{spec.armor}</dd></div></dl></div></article>;
+                })}
               {almanacCategory === "zombies" && !Object.values(ZOMBIE_SPECS).some((spec) => (playerData.zombieKills[spec.key] || 0) > 0) && <p className="almanac-empty">{t("No zombies defeated yet.")}</p>}
               {almanacCategory === "tiles" && Object.values(TILE_DEFINITIONS).map((tile) => <article key={tile.key} className="almanac-card tile-card"><div className={`almanac-tile-swatch ${tile.key}`} /><div><p className="almanac-type">{t("Tile")}</p><h3>{t(({ normal: "Lawn", normalDark: "Dark lawn", obstructed: "Obstructed", sunflowerStatue: "Sunflower statue", sunShroomStatue: "Sun-shroom statue", grave: "Gravestone" } as Record<string, string>)[tile.key] || tile.key)}</h3><p>{t(tile.description)}</p><dl><div><dt>{t("Plantable")}</dt><dd>{t(tile.canPlant ? "Yes" : "No")}</dd></div><div><dt>{t("Label")}</dt><dd>{t(tile.label || "None")}</dd></div></dl></div></article>)}
             </div>
@@ -2881,7 +2941,8 @@ export default function GameScreen() {
               <div className="loadout-heading"><div><p className="loadout-kicker">{t("Incoming threats")}</p><h2>{t("Zombies")}</h2></div><span className="zombie-count">{zombieTypes.length}</span></div>
               <div className="zombie-choice-list">
                 {zombieTypes.map((zombieType) => {
-                  return <div key={zombieType} className="zombie-choice"><div className="zombie-choice-art"><img src={getZombieImage(zombieType)} alt="" />{(zombieType === "cone" || zombieType === "bucket") && <img src={zombieType === "cone" ? "/zombie/cone.webp" : "/zombie/bucket.webp"} alt="" className="zombie-choice-hat" />}</div><div><strong>{t(getZombieLabel(zombieType))}</strong></div></div>;
+                  const armorImage = getZombieArmorPreviewImage(zombieType);
+                  return <div key={zombieType} className="zombie-choice"><div className="zombie-choice-art"><img src={getZombieImage(zombieType)} alt="" />{armorImage && <img src={armorImage} alt="" className={`zombie-choice-hat ${zombieType === "screenDoorZombie" ? "screen-door-choice-door" : zombieType === "footballZombie" ? "football-helmet-choice" : ""}`} />}</div><div><strong>{t(getZombieLabel(zombieType))}</strong></div></div>;
                 })}
               </div>
             </aside>
@@ -2894,7 +2955,7 @@ export default function GameScreen() {
             <div className="game-toolbar">
               {!["conveyor", "wall-nut-bowling"].includes(currentLevel?.mode || "") && <div ref={sunCounterRef} className="sun-counter" aria-label={`${sun} ${t("sun")} ${t("available")}`}><img className="sun-token" src="/other/sun.webp" alt="" /> <strong>{sun}</strong></div>}
               {currentLevel?.conveyor && ["conveyor", "wall-nut-bowling"].includes(currentLevel.mode) ? (
-                <div className="conveyor-belt" aria-label={t("Conveyor")}>
+                <div className={`conveyor-belt ${currentLevel.mode === "wall-nut-bowling" ? "wall-nut-bowling-conveyor" : ""}`} aria-label={t("Conveyor")}>
                   {conveyorCards.map((card) => <button
                     key={card.id}
                     type="button"
@@ -3252,7 +3313,8 @@ export default function GameScreen() {
 
                 {/* Zombie overlay: render zombies absolutely so they can move smoothly (fractional x) */}
                 {zombies.map((z) => {
-                  const armorImage = getZombieArmorImage(z.type, z.armor, z.armorBrokenAt, gameTime);
+                  const isDead = z.hp <= 0;
+                  const armorImage = isDead ? null : getZombieArmorImage(z.type, z.armor, z.armorBrokenAt, gameTime);
                   const armorIsFalling = Boolean(z.armorBrokenAt && gameTime - z.armorBrokenAt < 2000);
                   const vaultProgress = z.poleVaultStartedAt !== undefined && z.poleVaultingUntil
                     ? Math.min(1, Math.max(0, (gameTime - z.poleVaultStartedAt) / 2000))
@@ -3275,26 +3337,49 @@ export default function GameScreen() {
                       }}
                     >
                       <div
-                        className={`relative ${z.type === "gargantuar" || z.type === "horseman" ? "h-32 w-32" : z.type === "poleVaulting" ? "h-28 w-28" : z.type === "imp" ? "h-16 w-16" : "h-20 w-20"}`}
-                        style={{ transform: `scale(${z.hypnotizedVisualScale || 1})`, transformOrigin: "bottom center" }}
+                        className={`relative ${z.type === "gargantuar" || z.type === "horseman" ? "h-32 w-32" : z.type === "poleVaulting" ? "h-28 w-28" : z.type === "imp" ? "h-16 w-16" : "h-20 w-20"} ${isDead ? "zombie-death" : ""}`}
+                        style={isDead
+                          ? { "--zombie-death-scale": z.hypnotizedVisualScale || 1 } as CSSProperties
+                          : { transform: `scale(${z.hypnotizedVisualScale || 1})`, transformOrigin: "bottom center" }}
+                        onAnimationEnd={(event) => {
+                          if (isDead && event.target === event.currentTarget) {
+                            setZombiesState(zombiesRef.current.filter((zombie) => zombie.id !== z.id));
+                          }
+                        }}
                       >
                         <img src={zombieImage} alt={t(getZombieLabel(z.type))} className="absolute inset-0 h-full w-full origin-bottom object-contain" />
                         {armorImage && (
                           <span
-                            className="absolute origin-bottom"
-                            style={{
-                              width: "45%",
-                              height: "45%",
-                              left: z.hypnotized ? "62%" : "38%",
-                              top: "-28%",
-                              transform: `translateX(-50%)${z.hypnotized ? " scaleX(-1)" : ""}`,
-                            }}
+                            className={`absolute origin-bottom ${z.type === "screenDoorZombie" ? "zombie-screen-door" : ""}`}
+                            style={z.type === "screenDoorZombie"
+                              ? {
+                                width: "62%",
+                                height: "76%",
+                                left: z.hypnotized ? "82%" : "18%",
+                                top: "16%",
+                                transform: `translateX(-50%)${z.hypnotized ? " scaleX(-1)" : ""}`,
+                              }
+                              : z.type === "footballZombie"
+                                ? {
+                                  width: "50%",
+                                  height: "50%",
+                                  left: "40%",
+                                  top: "-2%",
+                                  transform: `translateX(-50%)${z.hypnotized ? " scaleX(-1)" : ""}`,
+                                }
+                              : {
+                                width: "45%",
+                                height: "45%",
+                                left: z.hypnotized ? "62%" : "38%",
+                                top: "-28%",
+                                transform: `translateX(-50%)${z.hypnotized ? " scaleX(-1)" : ""}`,
+                              }}
                           >
                             <img src={armorImage} alt="" className={`absolute inset-0 h-full w-full origin-bottom object-contain ${armorIsFalling ? "zombie-armor-falling" : ""}`} />
                           </span>
                         )}
                       </div>
-                      {showDebugHealth && <div className="mt-1 text-[10px] text-white text-center bg-rose-500/80 rounded-full px-2 py-0.5">{t("HP")}: {z.hp}{z.armor > 0 ? ` | ${t("A")}: ${z.armor}` : ""}</div>}
+                      {showDebugHealth && !isDead && <div className="mt-1 text-[10px] text-white text-center bg-rose-500/80 rounded-full px-2 py-0.5">{t("HP")}: {z.hp}{z.armor > 0 ? ` | ${t("A")}: ${z.armor}` : ""}</div>}
                     </div>
                   );
                 })}

@@ -6,7 +6,8 @@ import type { TileType } from "../tiles";
 import type { ConveyorConfig, LevelCategory, LevelChallenge, LevelMode, LevelReward } from "../types";
 
 export interface ZombieSpawn {
-  type: "basic" | "imp" | "cone" | "bucket" | "gargantuar" | "wallNutZombie" | "peashooterZombie" | "horseman" | "undyingWraith" | "poleVaulting";
+  type: "basic" | "imp" | "cone" | "bucket" | "footballZombie" | "chickenJockeyZombie" | "screenDoorZombie"
+    | "gargantuar" | "wallNutZombie" | "peashooterZombie" | "horseman" | "undyingWraith" | "poleVaulting";
   count: number;
 }
 

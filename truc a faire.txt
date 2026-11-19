@@ -15,8 +15,6 @@ avec les modifications du menu principal mettre une image dans le fond pour le c
 fusion à regarder sur le wiki de pvz fusion : comet-shroom, cherry pop
 Check aussi pour ajouter doom shroom à obtenir
 
-ajouter des niveaux wall-nut bowling, conveyor, prepare you're defense level.
-
 rajouter des sonds / musiques.
 rajouter des tiles / les utiliser dans les nouveaux niveaux
 rajouter paramètres langues à sauvegarder dans les data du joueurs.

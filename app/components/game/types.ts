@@ -164,6 +164,7 @@ export interface ZombieInstance {
   isWave: boolean;
   spawnedAt: number;
   type: string;
+  deathStartedAt?: number;
   armorBrokenAt?: number;
   contactStartedAt?: number;
   sunOnKill?: number;

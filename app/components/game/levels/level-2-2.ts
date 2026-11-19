@@ -4,7 +4,8 @@ export const LEVEL_2_2: LevelDefinition = {
   id: 202,
   category: "night",
   unlockAfterLevelId: 201,
-  title: "The night of the dead",
+  initialSun: 150,
+  title: "Graveyard Shift",
   description: "",
   initialDelayMs: 20000,
   regularSpawnIntervalMs: 30000,
@@ -22,5 +23,12 @@ export const LEVEL_2_2: LevelDefinition = {
     ["normalDark", "normal", "normalDark", "normal", "normalDark", "grave", "normalDark", "normal"],
   ],
   waves: [
+    { zombies: [{ type: "basic", count: 2 }] },
+    { zombies: [{ type: "basic", count: 2 }] },
+    { zombies: [{ type: "basic", count: 3 }, { type: "cone", count: 2 }] },
+    { zombies: [{ type: "basic", count: 5 }, { type: "cone", count: 5 }], bossWaves: true },
+    { zombies: [{ type: "bucket", count: 2 }] },
+    { zombies: [{ type: "basic", count: 4 }, { type: "undyingWraith", count: 2 }] },
+    { zombies: [{ type: "bucket", count: 5 }, { type: "undyingWraith", count: 8 }, { type: "basic", count: 4 }], bossWaves: true },
   ],
 };
