@@ -33,6 +33,10 @@ import { LEVEL_2_7 } from "./night/level-2-7";
 import { LEVEL_2_8 } from "./night/level-2-8";
 import { LEVEL_2_9 } from "./night/level-2-9";
 import { LEVEL_2_10 } from "./night/level-2-10";
+import { LEVEL_all_graves_1 } from "./minigame/level-all-graves-1";
+import { LEVEL_all_graves_2 } from "./minigame/level-all-graves-2";
+import { LEVEL_all_graves_3 } from "./minigame/level-all-graves-3";
+import { LEVEL_all_graves_4 } from "./minigame/level-all-graves-4";
 
 // Compile all level definitions
 const COMPILED_LEVELS = [
@@ -68,6 +72,10 @@ const COMPILED_LEVELS = [
   LEVEL_2_9,
   LEVEL_2_10,
   LEVEL_12Lanes_day,
+  LEVEL_all_graves_1,
+  LEVEL_all_graves_2,
+  LEVEL_all_graves_3,
+  LEVEL_all_graves_4,
   LEVEL_test,
 ].map(compileLevelDefinition);
 
