@@ -1,0 +1,38 @@
+import type { LevelDefinition } from "../types";
+
+export const LEVEL_10: LevelDefinition = {
+    id: 10,
+    unlockAfterLevelId: 9,
+    title: "Gargantuar's Yard",
+    description: "The final lawn brings the Gargantuar. Spend every tool wisely.",
+    introTexts: [
+        "A Gargantuar is coming.",
+        "Use Cherry Bombs to deal heavy damage to every zombie in a 3x3 area.",
+    ],
+    initialDelayMs: 20000,
+    regularSpawnIntervalMs: 30000,
+    betweenWaveDelayMs: 3000,
+    waveSpawnIntervalMs: 1400,
+    skySunIntervalMs: 10000,
+    backgroundImage: "/other/bg-day.webp",
+    musicTrack: "/sound/day.mp3",
+    reward: { glove: true },
+    tiles: [
+        ["normal", "normalDark", "normal", "normalDark", "normal", "normalDark", "normal", "normalDark"],
+        ["normalDark", "normal", "normalDark", "normal", "normalDark", "normal", "normalDark", "normal"],
+        ["normal", "normalDark", "normal", "normalDark", "normal", "normalDark", "normal", "normalDark"],
+        ["normalDark", "normal", "normalDark", "normal", "normalDark", "normal", "normalDark", "normal"],
+        ["normal", "normalDark", "normal", "normalDark", "normal", "normalDark", "normal", "normalDark"],
+        ["normalDark", "normal", "normalDark", "normal", "normalDark", "normal", "normalDark", "normal"],
+    ],
+    waves: [
+        { zombies: [{ type: "basic", count: 3 }] },
+        { zombies: [{ type: "cone", count: 2 }] },
+        { zombies: [{ type: "bucket", count: 1 }] },
+        { zombies: [{ type: "basic", count: 5 }, { type: "cone", count: 3 }] },
+        { zombies: [{ type: "bucket", count: 2 }] },
+        { zombies: [{ type: "basic", count: 5 }, { type: "cone", count: 3 }, { type: "bucket", count: 1 }], bossWaves: true },
+        { zombies: [{ type: "basic", count: 5 }, { type: "cone", count: 3 }, { type: "bucket", count: 2 }] },
+        { zombies: [{ type: "gargantuar", count: 1 }, { type: "basic", count: 6 }, { type: "cone", count: 4 }, { type: "bucket", count: 3 }], bossWaves: true },
+    ],
+};
