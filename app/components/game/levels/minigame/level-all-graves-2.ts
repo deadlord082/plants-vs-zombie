@@ -1,0 +1,37 @@
+import type { LevelDefinition } from "../types";
+
+export const LEVEL_all_graves_2: LevelDefinition = {
+  id: 1003,
+  category: "mini-game",
+  unlockAfterLevelId: 1002,
+  initialSun: 150,
+  title: "grave lawn 2",
+  description: "",
+  initialDelayMs: 20000,
+  regularSpawnIntervalMs: 30000,
+  betweenWaveDelayMs: 3000,
+  waveSpawnIntervalMs: 1200,
+  backgroundImage: "/other/bg-night.webp",
+  musicTrack: "/sound/night.mp3",
+  reward: { money: 200 },
+  tiles: [
+    ["normal", "normalDark", "grave", "grave", "grave", "grave", "grave", "grave"],
+    ["normalDark", "normal", "grave", "grave", "grave", "grave", "grave", "grave"],
+    ["normal", "normalDark", "grave", "grave", "grave", "grave", "grave", "grave"],
+    ["normalDark", "normal", "grave", "grave", "grave", "grave", "grave", "grave"],
+    ["normal", "normalDark", "grave", "grave", "grave", "grave", "grave", "grave"],
+    ["normalDark", "normal", "grave", "grave", "grave", "grave", "grave", "grave"],
+  ],
+  waves: [
+    { zombies: [{ type: "basic", count: 1 }] },
+    { zombies: [{ type: "basic", count: 2 }] },
+    { zombies: [{ type: "basic", count: 3 }] },
+    { zombies: [{ type: "basic", count: 4 }] },
+    { zombies: [{ type: "basic", count: 5 }] },
+    { zombies: [{ type: "basic", count: 3 }, { type: "footballZombie", count: 2 }], bossWaves: true },
+    { zombies: [{ type: "basic", count: 5 }, { type: "cone", count: 5 }], bossWaves: true },
+    { zombies: [{ type: "footballZombie", count: 2 }], bossWaves: true },
+    { zombies: [{ type: "basic", count: 4 }, { type: "undyingWraith", count: 2 }], bossWaves: true },
+    { zombies: [{ type: "bucket", count: 5 }, { type: "undyingWraith", count: 8 }, { type: "basic", count: 4 }], bossWaves: true },
+  ],
+};

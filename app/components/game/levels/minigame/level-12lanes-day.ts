@@ -1,17 +1,17 @@
 import type { LevelDefinition } from "../types";
 
-export const LEVEL_12Lanes: LevelDefinition = {
+export const LEVEL_12Lanes_day: LevelDefinition = {
   id: 100,
   category: "mini-game",
-  title: "12 lanes lawn",
+  title: "12 lanes lawn day",
   description: "",
   initialDelayMs: 8000,
   regularSpawnIntervalMs: 18000,
   betweenWaveDelayMs: 2500,
   waveSpawnIntervalMs: 850,
   skySunIntervalMs: 9000,
-  backgroundImage: "/other/bg-night.webp",
-  musicTrack: "/sound/night.mp3",
+  backgroundImage: "/other/bg-day.webp",
+  musicTrack: "/sound/day.mp3",
   reward: { money: 200 },
   tiles: [
     ["normal", "normalDark", "normal", "normalDark", "normal", "normalDark", "normal", "normalDark", "normal", "normalDark", "normal", "normalDark", "normal", "normalDark", "normal", "normalDark"],

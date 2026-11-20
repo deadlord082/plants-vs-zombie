@@ -19,7 +19,7 @@ import { LEVEL_17 } from "./day/level-17";
 import { LEVEL_18 } from "./day/level-18";
 import { LEVEL_19 } from "./day/level-19";
 import { LEVEL_20 } from "./day/level-20";
-import { LEVEL_12Lanes } from "./minigame/level-12lanes";
+import { LEVEL_12Lanes } from "./minigame/level-12lanes-day";
 import { LEVEL_test } from "./minigame/level-test";
 import { compileLevelDefinition, toLevelConfig } from "./loader";
 import type { LevelConfig } from "../types";

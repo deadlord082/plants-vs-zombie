@@ -1,0 +1,35 @@
+import type { LevelDefinition } from "../types";
+
+export const LEVEL_all_graves_4: LevelDefinition = {
+  id: 1005,
+  category: "mini-game",
+  unlockAfterLevelId: 1004,
+  initialSun: 150,
+  title: "grave lawn 4",
+  description: "",
+  initialDelayMs: 20000,
+  regularSpawnIntervalMs: 30000,
+  betweenWaveDelayMs: 3000,
+  waveSpawnIntervalMs: 1200,
+  backgroundImage: "/other/bg-night.webp",
+  musicTrack: "/sound/night.mp3",
+  reward: { money: 200 },
+  tiles: [
+    ["normal", "grave", "grave", "grave", "grave", "grave", "grave", "grave"],
+    ["normal", "grave", "grave", "grave", "grave", "grave", "grave", "grave"],
+    ["normal", "grave", "grave", "grave", "grave", "grave", "grave", "grave"],
+    ["normal", "grave", "grave", "grave", "grave", "grave", "grave", "grave"],
+    ["normal", "grave", "grave", "grave", "grave", "grave", "grave", "grave"],
+    ["normal", "grave", "grave", "grave", "grave", "grave", "grave", "grave"],
+  ],
+  waves: [
+    { zombies: [{ type: "basic", count: 1 }] },
+    { zombies: [{ type: "basic", count: 2 }] },
+    { zombies: [{ type: "basic", count: 3 }] },
+    { zombies: [{ type: "gargantuar", count: 1 }, { type: "footballZombie", count: 6 }], bossWaves: true },
+    { zombies: [{ type: "basic", count: 1 }] },
+    { zombies: [{ type: "gargantuar", count: 2 }, { type: "footballZombie", count: 12 }], bossWaves: true },
+    { zombies: [{ type: "screenDoorZombie", count: 32 }, { type: "undyingWraith", count: 32 }], bossWaves: true },
+    { zombies: [{ type: "gargantuar", count: 6 }, { type: "footballZombie", count: 32 }], bossWaves: true },
+  ],
+};
